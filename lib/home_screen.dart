@@ -24,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   double _angleOffset = 0.0;
 
-  int? _groupValue = 0;
+  int? _groupValue = 4; // Default to max rate
 
   int _sampleCount = 0;
   int _sampleRate = 0;
@@ -33,6 +33,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+
+    setUpdateInterval(4, 250); // Set to max achievable: 250 µs for ~400Hz
 
     _sampleRateTimer = Timer.periodic(Duration(seconds: 1), (_) {
       setState(() {
