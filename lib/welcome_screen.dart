@@ -1,5 +1,7 @@
 // welcome_screen.dart
+import 'package:accelerometer/patient_router.dart';
 import 'package:flutter/material.dart';
+import 'package:accelerometer/patient_list_screen.dart';
 import 'home_screen.dart'; // For the test functionality
 
 class WelcomeScreen extends StatelessWidget {
@@ -21,7 +23,7 @@ class WelcomeScreen extends StatelessWidget {
             _buildMenuButton(context, 'New Test', Colors.orange, () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => HomeScreen()),
+                MaterialPageRoute(builder: (context) => PatientRouterScreen()),
               );
             }),
             const SizedBox(height: 20),
@@ -31,6 +33,10 @@ class WelcomeScreen extends StatelessWidget {
             const SizedBox(height: 20),
             _buildMenuButton(context, 'Patient Database', Colors.deepOrange, () {
               // Add navigation to Patient Database page
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const PatientListScreen()),
+              );
             }),
           ],
         ),

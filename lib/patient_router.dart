@@ -27,7 +27,7 @@ class PatientRouterScreen extends StatelessWidget {
             _buildButton(context, 'Yes', () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const PatientRouterScreen()),
+                MaterialPageRoute(builder: (context) => const PatientFormScreen()),
               );
             }),
             const SizedBox(height: 20),

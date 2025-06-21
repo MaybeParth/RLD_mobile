@@ -1,51 +1,103 @@
-// patient_list_screen.dart
 import 'package:flutter/material.dart';
+import '../models/patients.dart';
+import '../db/patient_database.dart';
+import 'home_screen.dart';
 
-class PatientListScreen extends StatelessWidget {
+class PatientListScreen extends StatefulWidget {
   const PatientListScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final List<Map<String, String>> patients = [
-      {
-        'id': '001',
-        'age': '83 yr old - Male',
-        'condition': 'Type 2 diabetic'
-      },
-      {
-        'id': '002',
-        'age': '64 yr old - Female',
-        'condition': 'ACL tear: R. Knee (10/27/2017)'
-      },
-      {
-        'id': '003',
-        'age': '76 yr old - Female',
-        'condition': 'L. Knee pain [Rated: 6/10]'
-      },
-    ];
+  State<PatientListScreen> createState() => _PatientListScreenState();
+}
 
+class _PatientListScreenState extends State<PatientListScreen> {
+  List<Patient> patients = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPatients();
+  }
+
+  Future<void> _loadPatients() async {
+    final data = await PatientDatabase.getAllPatients();
+    setState(() {
+      patients = data;
+    });
+  }
+
+  void _showPatientPopup(Patient patient) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${patient.name} (ID: ${patient.id})'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Name: ${patient.name}"),
+            Text("Age: ${patient.age}"),
+            Text("Gender: ${patient.gender}"),
+            Text("Condition: ${patient.condition}"),
+            const Divider(),
+            Text("Drop Angle: ${patient.dropAngle?.toStringAsFixed(2) ?? '--'}°"),
+            Text("Drop Time: ${patient.dropTimeMs?.toStringAsFixed(0) ?? '--'} ms"),
+            Text("Motor Velocity: ${patient.motorVelocity?.toStringAsFixed(2) ?? '--'} °/s"),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => HomeScreen(patient: patient)),
+              );
+            },
+            child: const Text("Perform New Test"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Close"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Patient Database')),
-      body: ListView.builder(
+      body: patients.isEmpty
+          ? const Center(child: Text("No patient records found."))
+          : ListView.builder(
         itemCount: patients.length,
         itemBuilder: (context, index) {
           final patient = patients[index];
-          return ListTile(
-            leading: CircleAvatar(
-              child: Icon(
-                patient['age']!.contains('Male') ? Icons.male : Icons.female,
-              ),
-            ),
-            title: Text('ID#: ${patient['id']}'),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  patient['age']!,
-                  style: TextStyle(color: patient['age']!.contains('Male') ? Colors.red : Colors.purple),
+          return Card(
+            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            elevation: 3,
+            child: ListTile(
+              leading: CircleAvatar(
+                child: Icon(
+                  patient.gender.toLowerCase().contains('male') ? Icons.male : Icons.female,
                 ),
-                Text(patient['condition']!),
-              ],
+              ),
+              title: Text('${patient.name} (ID: ${patient.id})'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${patient.age} yr old - ${patient.gender}',
+                    style: TextStyle(
+                      color: patient.gender.toLowerCase().contains('male') ? Colors.red : Colors.purple,
+                    ),
+                  ),
+                  Text(patient.condition),
+                ],
+              ),
+              onTap: () => _showPatientPopup(patient),
             ),
           );
         },
