@@ -69,38 +69,47 @@ class _PatientListScreenState extends State<PatientListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Patient Database')),
-      body: patients.isEmpty
-          ? const Center(child: Text("No patient records found."))
-          : ListView.builder(
-        itemCount: patients.length,
-        itemBuilder: (context, index) {
-          final patient = patients[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            elevation: 3,
-            child: ListTile(
-              leading: CircleAvatar(
-                child: Icon(
-                  patient.gender.toLowerCase().contains('male') ? Icons.male : Icons.female,
-                ),
-              ),
-              title: Text('${patient.name} (ID: ${patient.id})'),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${patient.age} yr old - ${patient.gender}',
-                    style: TextStyle(
-                      color: patient.gender.toLowerCase().contains('male') ? Colors.red : Colors.purple,
-                    ),
+      body: RefreshIndicator(
+        onRefresh: _loadPatients,
+        child: patients.isEmpty
+            ? ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 200),
+            Center(child: Text("No patient records found.")),
+          ],
+        )
+            : ListView.builder(
+          itemCount: patients.length,
+          itemBuilder: (context, index) {
+            final patient = patients[index];
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              elevation: 3,
+              child: ListTile(
+                leading: CircleAvatar(
+                  child: Icon(
+                    patient.gender.toLowerCase().contains('male') ? Icons.male : Icons.female,
                   ),
-                  Text(patient.condition),
-                ],
+                ),
+                title: Text('${patient.name} (ID: ${patient.id})'),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${patient.age} yr old - ${patient.gender}',
+                      style: TextStyle(
+                        color: patient.gender.toLowerCase().contains('male') ? Colors.red : Colors.purple,
+                      ),
+                    ),
+                    Text(patient.condition),
+                  ],
+                ),
+                onTap: () => _showPatientPopup(patient),
               ),
-              onTap: () => _showPatientPopup(patient),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
