@@ -26,6 +26,45 @@ class _PatientListScreenState extends State<PatientListScreen> {
     });
   }
 
+  Future<void> _deletePatient(Patient patient) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Confirm Delete'),
+        content: Text('Are you sure you want to delete ${patient.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed ?? false) {
+      await PatientDatabase.deletePatient(patient.id);
+      final removedPatient = patient;
+      setState(() => patients.remove(patient));
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Deleted ${removedPatient.name}"),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () async {
+              await PatientDatabase.insertPatient(removedPatient);
+              _loadPatients();
+            },
+          ),
+        ),
+      );
+    }
+  }
+
   void _showPatientPopup(Patient patient) {
     showDialog(
       context: context,
@@ -83,29 +122,43 @@ class _PatientListScreenState extends State<PatientListScreen> {
           itemCount: patients.length,
           itemBuilder: (context, index) {
             final patient = patients[index];
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              elevation: 3,
-              child: ListTile(
-                leading: CircleAvatar(
-                  child: Icon(
-                    patient.gender.toLowerCase().contains('male') ? Icons.male : Icons.female,
-                  ),
-                ),
-                title: Text('${patient.name} (ID: ${patient.id})'),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${patient.age} yr old - ${patient.gender}',
-                      style: TextStyle(
-                        color: patient.gender.toLowerCase().contains('male') ? Colors.red : Colors.purple,
-                      ),
+            return Dismissible(
+              key: Key(patient.id),
+              direction: DismissDirection.endToStart,
+              confirmDismiss: (direction) async {
+                await _deletePatient(patient);
+                return false; // Prevent Dismissible from auto-removing the item
+              },
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 20),
+                color: Colors.red,
+                child: const Icon(Icons.delete, color: Colors.white),
+              ),
+              child: Card(
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                elevation: 3,
+                child: ListTile(
+                  leading: CircleAvatar(
+                    child: Icon(
+                      patient.gender.toLowerCase().contains('male') ? Icons.male : Icons.female,
                     ),
-                    Text(patient.condition),
-                  ],
+                  ),
+                  title: Text('${patient.name} (ID: ${patient.id})'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${patient.age} yr old - ${patient.gender}',
+                        style: TextStyle(
+                          color: patient.gender.toLowerCase().contains('male') ? Colors.red : Colors.purple,
+                        ),
+                      ),
+                      Text(patient.condition),
+                    ],
+                  ),
+                  onTap: () => _showPatientPopup(patient),
                 ),
-                onTap: () => _showPatientPopup(patient),
               ),
             );
           },

@@ -15,7 +15,7 @@ class PatientDatabase {
     final path = join(await getDatabasesPath(), 'patients.db');
     return await openDatabase(
       path,
-      version: 3, // <-- BUMPED VERSION
+      version: 3,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE patients (
@@ -70,5 +70,14 @@ class PatientDatabase {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query('patients');
     return maps.map((map) => Patient.fromMap(map)).toList();
+  }
+
+  static Future<void> deletePatient(String id) async {
+    final db = await database;
+    await db.delete(
+      'patients',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }

@@ -15,7 +15,7 @@ class PatientRouterScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Image.asset(
-              'assets/doctor_icon.png',
+              'assets/images/doc.png',
               height: 150,
             ),
             const SizedBox(height: 20),

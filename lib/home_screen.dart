@@ -27,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   double? _motorVelocity;
 
   double _angleOffset = 0.0;
+  double? _adjustedCalibration;
   int? _groupValue = 4;
   int _sampleCount = 0;
   int _sampleRate = 0;
@@ -76,8 +77,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void freezeInitialAngle() {
     setState(() {
       _initialAngleZ = _tiltZ;
+      _adjustedCalibration = _tiltZ?.clamp(0.0, 200.0);
       _startTime = DateTime.now();
     });
+    calibrateAngle();
   }
 
   void freezeFinalAngle() async {
@@ -126,38 +129,42 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) {
         double current = _tiltZ ?? 0;
-        double adjusted = current;
-        return AlertDialog(
-          title: Text("Calibrate Angle"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text("Current Angle: ${current.toStringAsFixed(2)}°"),
-              Text("Select Correct Angle:"),
-              Slider(
-                value: adjusted,
-                min: 0,
-                max: 200,
-                onChanged: (val) {
+        double adjusted = _adjustedCalibration ?? current.clamp(0.0, 200.0);
+
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            title: Text("Calibrate Angle"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text("Current Angle: ${current.toStringAsFixed(2)}°"),
+                Text("Select Correct Angle:"),
+                Slider(
+                  value: adjusted,
+                  min: 0,
+                  max: 200,
+                  onChanged: (val) {
+                    setState(() {
+                      adjusted = val;
+                      _adjustedCalibration = adjusted;
+                    });
+                  },
+                ),
+                Text("Adjusted to: ${adjusted.toStringAsFixed(2)}°"),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
                   setState(() {
-                    adjusted = val;
+                    _angleOffset = adjusted - current;
                   });
+                  Navigator.pop(context);
                 },
+                child: Text("Set Offset"),
               ),
-              Text("Adjusted to: ${adjusted.toStringAsFixed(2)}°"),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _angleOffset = adjusted - current;
-                });
-                Navigator.pop(context);
-              },
-              child: Text("Set Offset"),
-            ),
-          ],
         );
       },
     );
