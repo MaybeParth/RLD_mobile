@@ -32,13 +32,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // Angle tracking on 0..180 (180 = extended)
   double? _liveAngleDeg;
   double? _peakDropAngleDeg; // MIN leg angle during trial (deepest drop)
-  DateTime? _timeOfPeak;
 
   // Test state & results
   TestState _testState = TestState.idle;
   double? _dropAngle;               // clinical drop = 180 − min(legAngle)
   DateTime? _startTime;
-  DateTime? _endTime;
   Duration? _dropTime;
   double? _motorVelocity;
 
@@ -68,7 +66,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   static const double _beta = 0.90;
   static const int _medianWin = 5;
   final List<double> _angleWindow = <double>[];
-  static const double _peakHysteresisDeg = 0.5;
   static const double _maxPhysicalDeg = 180.0;
   static const double _minValidDropAngle = 10.0;
   static const double _maxValidDropAngle = 90.0;
@@ -89,7 +86,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // Safety
   Timer? _autoStopTimer;
   static const Duration _maxTestDuration = Duration(seconds: 30);
-  static const int _autoRecalibrateEveryDrops = 12;
 
   // ---------- Init / dispose ----------
   @override
@@ -268,7 +264,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
         if ((fastUp && accelBump) || (fallbackUp && accelBump)) {
           _reactionDetected = true;
-          _timeOfPeak = _minAt;
           _peakDropAngleDeg = _minLegAngleDeg;
           _stopRecording();
         }
@@ -483,7 +478,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     setState(() {
       _testState = TestState.completed;
-      _endTime = DateTime.now();
       _finalAngleZ = _tiltZ;
 
       final minLeg = _minLegAngleDeg ?? (_liveAngleDeg ?? 180.0);
@@ -529,7 +523,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _dropDetected = false;
       _reactionDetected = false;
       _startTime = null;
-      _endTime = null;
       _minAt = null;
       _dropStartAt = null;
       _angleWindow.clear();
@@ -897,23 +890,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildSignalQuality() {
     Color qualityColor;
     IconData qualityIcon;
-    String qualityText;
 
     switch (_signalQuality) {
       case SignalQuality.poor:
         qualityColor = Colors.red;
         qualityIcon = Icons.signal_cellular_connected_no_internet_0_bar;
-        qualityText = "Poor";
         break;
       case SignalQuality.fair:
         qualityColor = Colors.orange;
         qualityIcon = Icons.signal_cellular_alt;
-        qualityText = "Fair";
         break;
       case SignalQuality.good:
         qualityColor = Colors.green;
         qualityIcon = Icons.signal_cellular_4_bar;
-        qualityText = "Good";
         break;
     }
 

@@ -12,8 +12,6 @@ class PatientFormScreen extends StatelessWidget {
     final nameController = TextEditingController();
     final ageController = TextEditingController();
     final genderController = TextEditingController();
-    final heightController = TextEditingController();
-    final weightController = TextEditingController();
     final commentsController = TextEditingController();
 
     return Scaffold(
@@ -26,8 +24,6 @@ class PatientFormScreen extends StatelessWidget {
             _buildTextField('Name *', nameController),
             _buildTextField('Age (yrs)', ageController, keyboardType: TextInputType.number),
             _buildTextField('Male/Female', genderController),
-            _buildTextField('Height (m)', heightController, keyboardType: TextInputType.number),
-            _buildTextField('Weight (kg)', weightController, keyboardType: TextInputType.number),
             _buildTextField('Comments / Relevant History', commentsController, maxLines: 4),
             const SizedBox(height: 20),
             ElevatedButton(

@@ -1,8 +1,8 @@
 // welcome_screen.dart
-import 'package:accelerometer/patient_router.dart';
 import 'package:flutter/material.dart';
-import 'package:accelerometer/patient_list_screen.dart';
-import 'home_screen.dart'; // For the test functionality
+import 'patient_list_screen.dart';
+import 'bloc_screens/patient_form_screen_bloc.dart';
+import 'screens/patient_instructions_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -23,12 +23,12 @@ class WelcomeScreen extends StatelessWidget {
             _buildMenuButton(context, 'New Test', Colors.orange, () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => PatientRouterScreen()),
+                MaterialPageRoute(builder: (context) => const PatientFormScreenBloc()),
               );
             }),
             const SizedBox(height: 20),
             _buildMenuButton(context, 'Instructions', Colors.orange, () {
-              // Add navigation to Instructions page
+              _showGeneralInstructions(context);
             }),
             const SizedBox(height: 20),
             _buildMenuButton(context, 'Patient Database', Colors.deepOrange, () {
@@ -58,6 +58,23 @@ class WelcomeScreen extends StatelessWidget {
       child: Text(
         label,
         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  void _showGeneralInstructions(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PatientInstructionsScreen(
+          patientName: 'User',
+          onContinue: () {
+            Navigator.pop(context);
+          },
+          onBack: () {
+            Navigator.pop(context);
+          },
+        ),
       ),
     );
   }

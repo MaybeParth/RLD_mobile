@@ -15,7 +15,7 @@ class PatientDatabase {
     final path = p.join(await getDatabasesPath(), 'patients.db');
     return await openDatabase(
       path,
-      version: 5, // ⬅️ bump to add calibration fields
+      version: 6, // ⬅️ bump to add trials and new fields
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE patients (
@@ -29,14 +29,17 @@ class PatientDatabase {
             dropAngle REAL,
             dropTime REAL,
             motorVelocity REAL,
-            createdAt TEXT,
-            lastModified TEXT,
+            trials TEXT,
+            currentTrialNumber INTEGER,
             calZeroOffsetDeg REAL,
             calRefX REAL, calRefY REAL, calRefZ REAL,
             calUX REAL, calUY REAL, calUZ REAL,
             calVX REAL, calVY REAL, calVZ REAL,
             calibratedAtIso TEXT,
-            dropsSinceCal INTEGER
+            dropsSinceCal INTEGER,
+            customBaselineAngle REAL,
+            createdAt TEXT,
+            lastModified TEXT
           )
         ''');
       },
@@ -62,6 +65,11 @@ class PatientDatabase {
           ]) { try { await db.execute('ALTER TABLE patients ADD COLUMN $col REAL'); } catch (_) {} }
           try { await db.execute('ALTER TABLE patients ADD COLUMN calibratedAtIso TEXT'); } catch (_) {}
           try { await db.execute('ALTER TABLE patients ADD COLUMN dropsSinceCal INTEGER'); } catch (_) {}
+        }
+        if (oldVersion < 6) {
+          try { await db.execute('ALTER TABLE patients ADD COLUMN trials TEXT'); } catch (_) {}
+          try { await db.execute('ALTER TABLE patients ADD COLUMN currentTrialNumber INTEGER'); } catch (_) {}
+          try { await db.execute('ALTER TABLE patients ADD COLUMN customBaselineAngle REAL'); } catch (_) {}
         }
       },
     );
