@@ -59,6 +59,11 @@ class _TestScreenBlocState extends State<TestScreenBloc> with TickerProviderStat
         title: Text('Test - ${widget.patient.name}'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.straighten),
+            tooltip: 'Calibrate to 180°',
+            onPressed: _calibrateTo180,
+          ),
+          IconButton(
             icon: const Icon(Icons.bug_report),
             onPressed: () => _showCalibrationDebug(),
             tooltip: 'Debug Calibration',
@@ -156,6 +161,22 @@ class _TestScreenBlocState extends State<TestScreenBloc> with TickerProviderStat
           ),
         ),
       ),
+    );
+  }
+
+  void _calibrateTo180() {
+    final state = context.read<TestBloc>().state;
+    final current = state.liveAngle;
+    if (current == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Live angle not available for calibration'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+    final newZero = state.zeroOffsetDeg + (180.0 - current);
+    context.read<TestBloc>().add(AdjustCalibration(newZero));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Calibrated offset set to ${newZero.toStringAsFixed(2)}°')), 
     );
   }
 

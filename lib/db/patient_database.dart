@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import '../models/patients.dart';
+import '../models/trial.dart';
 
 class PatientDatabase {
   static Database? _database;
@@ -15,7 +17,7 @@ class PatientDatabase {
     final path = p.join(await getDatabasesPath(), 'patients.db');
     return await openDatabase(
       path,
-      version: 6, // ⬅️ bump to add trials and new fields
+      version: 6, 
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE patients (
@@ -78,7 +80,7 @@ class PatientDatabase {
   static Future<void> insertPatient(Patient patient) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
-    final map = patient.toMap();            // ✅ fix: build map first
+    final map = patient.toMap();            
     map['createdAt'] = map['createdAt'] ?? now;
     map['lastModified'] = now;
 
@@ -128,9 +130,9 @@ class PatientDatabase {
   static Future<void> saveCalibration({
     required String id,
     required double zeroOffsetDeg,
-    required List<double> ref, // [x,y,z]
-    required List<double> u,   // [x,y,z]
-    required List<double> v,   // [x,y,z]
+    required List<double> ref, 
+    required List<double> u,   
+    required List<double> v,  
   }) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
@@ -147,6 +149,56 @@ class PatientDatabase {
       },
       where: 'id = ?',
       whereArgs: [id],
+    );
+  }
+
+  static Future<void> addTrialToPatient(String patientId, Trial trial) async {
+    final db = await database;
+    final patient = await getPatient(patientId);
+    if (patient == null) return;
+
+    final updatedTrials = List<Trial>.from(patient.trials)..add(trial);
+    // Correctly serialize each trial, not the last added one repeatedly
+    final trialsJson = updatedTrials.map((t) => t.toMap()).toList();
+    
+    await db.update(
+      'patients',
+      {
+        'trials': jsonEncode(trialsJson),
+        'currentTrialNumber': updatedTrials.length,
+        'lastModified': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [patientId],
+    );
+  }
+
+  static Future<void> updateTrialStatus(String patientId, String trialId, bool isKept, {String? notes, String? discardReason}) async {
+    final db = await database;
+    final patient = await getPatient(patientId);
+    if (patient == null) return;
+
+    final updatedTrials = patient.trials.map((trial) {
+      if (trial.id == trialId) {
+        return trial.copyWith(
+          isKept: isKept,
+          notes: notes,
+          discardReason: discardReason,
+        );
+      }
+      return trial;
+    }).toList();
+
+    final trialsJson = updatedTrials.map((t) => t.toMap()).toList();
+    
+    await db.update(
+      'patients',
+      {
+        'trials': jsonEncode(trialsJson),
+        'lastModified': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [patientId],
     );
   }
 

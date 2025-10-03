@@ -4,7 +4,8 @@ import '../models/patients.dart';
 import '../bloc/patient/patient_bloc.dart';
 import '../bloc/events/patient_events.dart';
 import '../bloc/states/patient_states.dart';
-import 'test_screen_bloc.dart';
+import 'simple_test_screen_bloc.dart';
+import '../db/patient_database.dart';
 
 class PatientFormScreenBloc extends StatefulWidget {
   const PatientFormScreenBloc({super.key});
@@ -46,15 +47,26 @@ class _PatientFormScreenBlocState extends State<PatientFormScreenBloc> {
             );
             
             // Navigate to test screen with the new patient
-            if (state.patients.isNotEmpty) {
-              final newPatient = state.patients.last;
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TestScreenBloc(patient: newPatient),
-                ),
-              );
-            }
+            () async {
+              final newId = _idController.text;
+              final fetched = await PatientDatabase.getPatient(newId);
+              if (mounted && fetched != null) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SimpleTestScreenBloc(patient: fetched),
+                  ),
+                );
+              } else if (mounted && state.patients.isNotEmpty) {
+                final fallback = state.patients.last;
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SimpleTestScreenBloc(patient: fallback),
+                  ),
+                );
+              }
+            }();
           } else if (state is PatientError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(

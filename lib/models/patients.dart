@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'trial.dart';
 
 class Patient {
@@ -130,11 +131,30 @@ class Patient {
   factory Patient.fromMap(Map<String, dynamic> map) {
     double? _d(dynamic v) => (v == null) ? null : (v as num).toDouble();
     
-    // Handle trials list
+    // Handle trials list - support both JSON string and List formats
     List<Trial> trials = [];
-    if (map['trials'] != null) {
-      final trialsList = map['trials'] as List<dynamic>;
-      trials = trialsList.map((trialMap) => Trial.fromMap(trialMap as Map<String, dynamic>)).toList();
+    final rawTrials = map['trials'];
+    if (rawTrials != null) {
+      try {
+        if (rawTrials is String) {
+          // Handle JSON string format (old database)
+          final decoded = jsonDecode(rawTrials) as List<dynamic>;
+          trials = decoded
+              .whereType<Map<String, dynamic>>()
+              .map((trialMap) => Trial.fromMap(trialMap))
+              .toList();
+        } else if (rawTrials is List) {
+          // Handle List format (new database)
+          trials = rawTrials
+              .whereType<Map<String, dynamic>>()
+              .map((trialMap) => Trial.fromMap(trialMap))
+              .toList();
+        }
+      } catch (e) {
+        // If parsing fails, return empty list
+        print('Warning: Failed to parse trials data: $e');
+        trials = [];
+      }
     }
     
     return Patient(

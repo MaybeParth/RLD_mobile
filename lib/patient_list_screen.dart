@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/patients.dart';
 import '../db/patient_database.dart';
-import 'home_screen.dart';
+import 'bloc_screens/simple_test_screen_bloc.dart';
 
 class PatientListScreen extends StatefulWidget {
   const PatientListScreen({super.key});
@@ -90,7 +90,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => HomeScreen(patient: patient)),
+                MaterialPageRoute(builder: (_) => SimpleTestScreenBloc(patient: patient)),
               );
             },
             child: const Text("Perform New Test"),

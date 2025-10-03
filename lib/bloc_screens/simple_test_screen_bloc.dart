@@ -1,93 +1,91 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vector_math/vector_math_64.dart' hide Colors;
 import 'package:dchs_motion_sensors/dchs_motion_sensors.dart';
 import 'dart:math' as math;
 import 'dart:async';
-import '../db/patient_database.dart';
+import '../bloc/test/test_bloc.dart';
+import '../bloc/events/test_events.dart';
 import '../models/patients.dart';
+import '../models/trial.dart';
+import '../db/patient_database.dart';
 
-class HomeScreen extends StatefulWidget {
+class SimpleTestScreenBloc extends StatefulWidget {
   final Patient patient;
-  const HomeScreen({super.key, required this.patient});
+  const SimpleTestScreenBloc({super.key, required this.patient});
+
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<SimpleTestScreenBloc> createState() => _SimpleTestScreenBlocState();
 }
 
 enum TestState { idle, calibrating, ready, recording, completed }
 enum SignalQuality { poor, fair, good }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  // ---------- Sensor & state ----------
+class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with TickerProviderStateMixin {
+  
   Vector3 _a = Vector3.zero();
   Vector3 _gFiltered = Vector3(0, 0, 1);
   Vector3? _gyro;
   StreamSubscription? _accelSub, _gyroSub;
 
-  // Calibration / plane (persisted per patient)
   Vector3? _gRef;
   Vector3? _planeU, _planeV;
   double _zeroOffsetDeg = 0.0;
   static const double _baselineAngle = 180.0;
 
-  // Angle tracking on 0..180 (180 = extended)
   double? _liveAngleDeg;
-  double? _peakDropAngleDeg; // MIN leg angle during trial (deepest drop)
+  double? _peakDropAngleDeg; 
 
-  // Test state & results
   TestState _testState = TestState.idle;
-  double? _dropAngle;               // clinical drop = 180 − min(legAngle)
+  double? _dropAngle;               
   DateTime? _startTime;
   Duration? _dropTime;
   double? _motorVelocity;
 
-  // Drop event timing
   bool _dropDetected = false;
   bool _reactionDetected = false;
   DateTime? _dropStartAt;
   double? _minLegAngleDeg;
   DateTime? _minAt;
 
-  // Legacy compatibility (kept)
   double? _tiltZ;
   double? _initialAngleZ;
   double? _finalAngleZ;
 
-  // Diagnostics
   int _sampleCount = 0;
   int _sampleRate = 0;
   Timer? _sampleRateTimer;
   SignalQuality _signalQuality = SignalQuality.good;
 
-  // Animations
   AnimationController? _pulseController;
   AnimationController? _recordingController;
 
-  // Filters & constants
   static const double _beta = 0.90;
   static const int _medianWin = 5;
   final List<double> _angleWindow = <double>[];
   static const double _maxPhysicalDeg = 180.0;
-  static const double _minValidDropAngle = 10.0;
-  static const double _maxValidDropAngle = 90.0;
 
-  // Velocity / noise
   DateTime? _lastAngleT;
   double? _lastAngleDeg;
   double _omegaDegPerSec = 0.0;
-  double _accelMag = 1.0; // in g approx (computed)
+  double _accelMag = 1.0; 
   double _noiseRmsDeg = 0.8;
 
-  // Adaptive thresholds (auto tuned; defaults below)
   double _omegaDropThreshDegPerSec = 120.0;
   double _omegaReactThreshDegPerSec = 100.0;
-  double _accelDipFrac = 0.75;  // |a| < 0.75 g -> onset
-  double _accelBumpFrac = 1.10; // |a| > 1.10 g -> reaction
+  double _accelDipFrac = 0.75;  
+  double _accelBumpFrac = 1.10; 
 
-  // Safety
   Timer? _autoStopTimer;
   static const Duration _maxTestDuration = Duration(seconds: 30);
 
-  // ---------- Init / dispose ----------
+  // Trial management
+  List<Trial> _keptTrials = [];
+  bool _trialDialogShown = false;
+  
+  // Calibration slider
+  bool _showCalibrationSlider = false;
+
   @override
   void initState() {
     super.initState();
@@ -106,12 +104,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _initializeSampleRateMonitoring();
     _startSensors();
 
-    // Load existing calibration if present for this patient
     _loadCalibrationFromPatient(widget.patient);
+    _loadKeptTrials();
   }
 
   void _startSensors() {
-    const int us = 1000; // request ~1kHz
+    const int us = 1000; 
     motionSensors.accelerometerUpdateInterval = us;
     motionSensors.userAccelerometerUpdateInterval = us;
     motionSensors.gyroscopeUpdateInterval = us;
@@ -119,14 +117,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _accelSub = motionSensors.accelerometer.listen((AccelerometerEvent e) {
       _sampleCount++;
 
-      // Low-pass gravity estimate
       _a.setValues(e.x, e.y, e.z);
       final gNext = (_gFiltered * _beta) + (Vector3(e.x, e.y, e.z) * (1.0 - _beta));
       if (gNext.length2 != 0) _gFiltered = gNext.normalized();
 
       _tiltZ = _zTilt(e.x, e.y, e.z);
 
-      // magnitude in g
       final g0 = 9.81;
       final mag = math.sqrt(e.x*e.x + e.y*e.y + e.z*e.z);
       _accelMag = mag / g0;
@@ -135,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
 
     _gyroSub = motionSensors.gyroscope.listen((g) {
-      _gyro = Vector3(g.x, g.y, g.z); // rad/s
+      _gyro = Vector3(g.x, g.y, g.z);
     });
   }
 
@@ -167,7 +163,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
-  // ---------- Math helpers ----------
   Vector3 _unit(Vector3 v) => (v.length2 == 0) ? Vector3(0, 0, 1) : v.normalized();
   double _clamp(double v, double lo, double hi) => v < lo ? lo : (v > hi ? hi : v);
 
@@ -179,7 +174,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return math.acos(d) * 180.0 / math.pi;
   }
 
-  // ---------- Sagittal plane angle (ignores left/right wobble) ----------
   double? _legAngleInPlane(Vector3 gCur) {
     if (_gRef == null || _planeU == null || _planeV == null) return null;
 
@@ -210,7 +204,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return sorted[sorted.length ~/ 2];
   }
 
-  // ---------- Live angle + event detection ----------
   void _updateLiveAngleAndDetect() {
     if (_gRef == null) {
       setState(() => _liveAngleDeg = null);
@@ -223,7 +216,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final smoothed = _medianSmooth(leg);
     setState(() => _liveAngleDeg = smoothed);
 
-    // angle velocity (deg/s)
     final now = DateTime.now();
     if (_lastAngleT != null && _lastAngleDeg != null) {
       final dt = now.difference(_lastAngleT!).inMicroseconds / 1e6;
@@ -232,11 +224,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _lastAngleT = now;
     _lastAngleDeg = smoothed;
 
-    // gyro projected onto plane normal (deg/s)
     double gyroInPlaneDeg = 0.0;
     if (_gyro != null && _planeU != null && _planeV != null) {
       final n = _planeU!.cross(_planeV!).normalized();
-      gyroInPlaneDeg = _gyro!.dot(n) * 180.0 / math.pi; // rad/s -> deg/s
+      gyroInPlaneDeg = _gyro!.dot(n) * 180.0 / math.pi;
     }
 
     if (_testState == TestState.recording) {
@@ -252,7 +243,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _minAt = now;
         }
       } else if (!_reactionDetected) {
-        // update minimum while falling
         if (_minLegAngleDeg == null || smoothed < _minLegAngleDeg!) {
           _minLegAngleDeg = smoothed;
           _minAt = now;
@@ -271,7 +261,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  // ---------- Pre-roll (auto-tune thresholds) ----------
   Future<void> _preRollNoiseCharacterization({int ms = 500}) async {
     final angles = <double>[];
     final mags = <double>[];
@@ -283,12 +272,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       angles.add(leg);
       mags.add(_accelMag);
       if (_gyro != null) {
-        gyroAbs.add(_gyro!.length); // rad/s magnitude
+        gyroAbs.add(_gyro!.length);
       }
       await Future.delayed(const Duration(milliseconds: 5));
     }
 
-    // estimate derivative RMS
     final n = angles.length;
     if (n >= 2) {
       final dtSec = (ms / math.max(1, n)) / 1000.0;
@@ -302,13 +290,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _noiseRmsDeg = 1.0;
     }
 
-    // fidget detection: if gyro is very active, skip auto-raise thresholds
     bool fidgety = false;
     if (gyroAbs.isNotEmpty) {
-      // convert to deg/s for check
       final degs = gyroAbs.map((r) => r * 180.0 / math.pi).toList()..sort();
       final p90 = degs[ (degs.length * 0.9).floor().clamp(0, degs.length - 1) ];
-      if (p90 > 30.0) { // very active device during pre-roll
+      if (p90 > 30.0) {
         fidgety = true;
       }
     }
@@ -316,11 +302,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (!fidgety) {
       _omegaDropThreshDegPerSec = (_noiseRmsDeg * 20.0).clamp(60.0, 160.0);
       _omegaReactThreshDegPerSec = (_noiseRmsDeg * 18.0).clamp(50.0, 140.0);
-      final meanMag = mags.reduce((a, b) => a + b) / mags.length; // around ~1.0
+      final meanMag = mags.reduce((a, b) => a + b) / mags.length;
       _accelDipFrac = (meanMag - 0.25).clamp(0.55, 0.9);
       _accelBumpFrac = (meanMag + 0.15).clamp(1.02, 1.40);
     } else {
-      // fall back to safer defaults and inform user
       _omegaDropThreshDegPerSec = 120.0;
       _omegaReactThreshDegPerSec = 100.0;
       _accelDipFrac = 0.80;
@@ -331,7 +316,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  // ---------- Reference capture & plane ----------
   Future<void> _captureStableReference({int samples = 60}) async {
     Vector3 sum = Vector3.zero();
     int got = 0;
@@ -380,7 +364,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final gFlex = _unit(sum / got.toDouble());
     if (_gRef == null) return false;
 
-    // validate flex 5–25°
     final delta = _angleBetween(_gRef!, gFlex);
     if (delta < 5.0 || delta > 25.0) return false;
 
@@ -396,29 +379,99 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return true;
   }
 
-  // ---------- Persistent calibration ----------
-  void _loadCalibrationFromPatient(Patient p) {
-    if (p.calRefX != null && p.calUX != null && p.calVX != null) {
-      _gRef = Vector3(p.calRefX!, p.calRefY!, p.calRefZ!).normalized();
-      _planeU = Vector3(p.calUX!, p.calUY!, p.calUZ!).normalized();
-      _planeV = Vector3(p.calVX!, p.calVY!, p.calVZ!).normalized();
-      _zeroOffsetDeg = p.calZeroOffsetDeg ?? 0.0;
-      setState(() {});
+  Future<void> _loadCalibrationFromPatient(Patient p) async {
+    try {
+      // Get fresh patient data from database
+      final freshPatient = await PatientDatabase.getPatient(p.id);
+      if (freshPatient != null) {
+        if (freshPatient.calRefX != null && freshPatient.calUX != null && freshPatient.calVX != null) {
+          _gRef = Vector3(freshPatient.calRefX!, freshPatient.calRefY!, freshPatient.calRefZ!).normalized();
+          _planeU = Vector3(freshPatient.calUX!, freshPatient.calUY!, freshPatient.calUZ!).normalized();
+          _planeV = Vector3(freshPatient.calVX!, freshPatient.calVY!, freshPatient.calVZ!).normalized();
+          _zeroOffsetDeg = freshPatient.calZeroOffsetDeg ?? 0.0;
+          setState(() {});
+        }
+      }
+    } catch (e) {
+      print('Error loading calibration: $e');
+    }
+  }
+
+  Future<void> _loadKeptTrials() async {
+    try {
+      final updatedPatient = await PatientDatabase.getPatient(widget.patient.id);
+      if (updatedPatient != null) {
+        // Sort kept trials newest-first (stack behavior)
+        final kept = List<Trial>.from(updatedPatient.keptTrials);
+        kept.sort((a, b) {
+          final at = a.timestamp;
+          final bt = b.timestamp;
+          if (at != null && bt != null) return bt.compareTo(at);
+          // Fallback to id-based ordering if timestamps are missing
+          return b.id.compareTo(a.id);
+        });
+        setState(() {
+          _keptTrials = kept;
+        });
+      }
+    } catch (e) {
+      print('Error loading kept trials: $e');
+    }
+  }
+
+
+  void _toggleCalibrationSlider() {
+    setState(() {
+      _showCalibrationSlider = !_showCalibrationSlider;
+    });
+  }
+
+  void _adjustCalibration(double newOffset) async {
+    print('Adjusting calibration to: $newOffset');
+    setState(() {
+      _zeroOffsetDeg = newOffset;
+    });
+    // Save calibration to database
+    await _saveCalibrationToDatabase();
+  }
+
+  Future<void> _saveCalibrationToDatabase() async {
+    try {
+      // Initialize calibration vectors if they don't exist
+      if (_gRef == null) {
+        _gRef = Vector3(0, 0, -1); // Default gravity reference
+      }
+      if (_planeU == null) {
+        _planeU = Vector3(1, 0, 0); // Default plane U
+      }
+      if (_planeV == null) {
+        _planeV = Vector3(0, 1, 0); // Default plane V
+      }
+      
+      await PatientDatabase.saveCalibration(
+        id: widget.patient.id,
+        zeroOffsetDeg: _zeroOffsetDeg,
+        ref: [_gRef!.x, _gRef!.y, _gRef!.z],
+        u: [_planeU!.x, _planeU!.y, _planeU!.z],
+        v: [_planeV!.x, _planeV!.y, _planeV!.z],
+      );
+      print('Calibration saved: offset=${_zeroOffsetDeg.toStringAsFixed(2)}°');
+    } catch (e) {
+      print('Error saving calibration: $e');
     }
   }
 
   Future<void> _saveCalibrationForPatient() async {
     if (_gRef == null || _planeU == null || _planeV == null) return;
-    await PatientDatabase.saveCalibration(
-      id: widget.patient.id,
+    // Save calibration via BLoC
+    context.read<TestBloc>().add(CalibrationComplete(
+      gRef: _gRef!,
+      planeU: _planeU!,
+      planeV: _planeV!,
       zeroOffsetDeg: _zeroOffsetDeg,
-      ref: [_gRef!.x, _gRef!.y, _gRef!.z],
-      u: [_planeU!.x, _planeU!.y, _planeU!.z],
-      v: [_planeV!.x, _planeV!.y, _planeV!.z],
-    );
+    ));
   }
 
-  // ---------- Workflow ----------
   void _requestMaxRate() {
     const int us = 1000;
     motionSensors.accelerometerUpdateInterval = us;
@@ -432,7 +485,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _startTest() async {
     if (_testState != TestState.idle) return;
 
-    // First-time calibration? Do it once and persist.
     if (_gRef == null || _planeU == null || _planeV == null) {
       await _captureStableReference(samples: 60);
       final okPlane = await _captureFlexAndBuildPlane(samples: 30);
@@ -442,18 +494,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return;
       }
 
-      // Auto-offset to show ≈ 180° at extension, plus a manual fine-tune slider (dialog below)
-      // The dialog will compute final _zeroOffsetDeg and save calibration.
-      _showCalibrationDialog(initialAuto: true);
-      return; // calibration dialog will continue flow
+      await _saveCalibrationForPatient();
     }
 
-    // Already calibrated → start recording
     setState(() {
       _testState = TestState.recording;
       _startTime = DateTime.now();
       _dropDetected = false;
       _reactionDetected = false;
+      _trialDialogShown = false;
       _peakDropAngleDeg = 180.0;
       _minLegAngleDeg = _liveAngleDeg ?? 180.0;
       _minAt = _startTime;
@@ -495,23 +544,235 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
     });
 
-    final updatedPatient = widget.patient.copyWith(
+    // Create trial and show decision dialog
+    final trial = Trial(
+      id: 'trial_${DateTime.now().millisecondsSinceEpoch}',
+      timestamp: DateTime.now(),
       initialZ: _initialAngleZ,
       finalZ: _finalAngleZ,
       dropAngle: _dropAngle,
       dropTimeMs: _dropTime?.inMilliseconds.toDouble(),
       motorVelocity: _motorVelocity,
-      // keep calibration as-is
+      peakDropAngle: _peakDropAngleDeg,
     );
 
-    await PatientDatabase.upsertPatient(updatedPatient);
-    await PatientDatabase.incrementDropsSinceCal(widget.patient.id);
-
-    if (!mounted) return;
-    _showSnackBar('Results saved for ${widget.patient.name}', Colors.green);
+    if (!_trialDialogShown) {
+      _trialDialogShown = true;
+      _showTrialDecisionDialog(trial);
+    }
   }
 
-  void _resetTest() {
+  void _showTrialDecisionDialog(Trial trial) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+            maxWidth: MediaQuery.of(context).size.width * 0.95,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+              // Header with icon
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.blue, size: 48),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Trial Complete!',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 20),
+              
+              // Trial results
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Drop Angle:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                        Text(
+                          '${trial.dropAngle?.toStringAsFixed(1) ?? 'N/A'}°',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Drop Time:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                        Text(
+                          '${trial.dropTimeMs?.toStringAsFixed(0) ?? 'N/A'}ms',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
+                        ),
+                      ],
+                    ),
+                    if (trial.motorVelocity != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Motor Velocity:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                          Text(
+                            '${trial.motorVelocity!.toStringAsFixed(1)}°/s',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 20),
+              
+              const Text(
+                'Would you like to keep this trial for analysis?',
+                style: TextStyle(fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              
+              const SizedBox(height: 24),
+              
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth > 480;
+                  if (isWide) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          fit: FlexFit.loose,
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              Navigator.of(context).pop();
+                              await _handleTrialDecision(trial, false);
+                            },
+                            icon: const Icon(Icons.delete_outline, color: Colors.red),
+                            label: const Text('Discard', style: TextStyle(color: Colors.red)),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Colors.red),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Flexible(
+                          fit: FlexFit.loose,
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              Navigator.of(context).pop();
+                              await _handleTrialDecision(trial, true);
+                            },
+                            icon: const Icon(Icons.check, color: Colors.white),
+                            label: const Text('Keep Trial', style: TextStyle(color: Colors.white, fontSize: 16)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          Navigator.of(context).pop();
+                          await _handleTrialDecision(trial, false);
+                        },
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        label: const Text('Discard', style: TextStyle(color: Colors.red, fontSize: 16)),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.red),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.of(context).pop();
+                          await _handleTrialDecision(trial, true);
+                        },
+                        icon: const Icon(Icons.check, color: Colors.white),
+                        label: const Text('Keep Trial', style: TextStyle(color: Colors.white, fontSize: 16)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleTrialDecision(Trial trial, bool isKept, {String? notes}) async {
+    print('Handling trial decision: isKept=$isKept');
+    try {
+      // Add trial to database
+      print('Adding trial to database...');
+      await PatientDatabase.addTrialToPatient(widget.patient.id, trial);
+      
+      if (isKept) {
+        // Update trial status to kept
+        print('Updating trial status to kept...');
+        await PatientDatabase.updateTrialStatus(widget.patient.id, trial.id, true, notes: notes);
+        _showSnackBar(notes != null ? 'Trial kept with notes and saved' : 'Trial kept and saved', Colors.green);
+      } else {
+        // Update trial status to discarded
+        print('Updating trial status to discarded...');
+        await PatientDatabase.updateTrialStatus(widget.patient.id, trial.id, false, discardReason: 'User discarded');
+        _showSnackBar('Trial discarded', Colors.orange);
+      }
+      
+      // Refresh kept trials and reset test for next trial
+      print('Refreshing kept trials and resetting test...');
+      await _loadKeptTrials();
+      _resetTestForNextTrial();
+      print('Trial decision handling complete - staying on test screen');
+      
+    } catch (e) {
+      print('Error in trial decision: $e');
+      _showSnackBar('Error saving trial: $e', Colors.red);
+    }
+  }
+
+  void _resetTestForNextTrial() {
     _autoStopTimer?.cancel();
     setState(() {
       _testState = TestState.idle;
@@ -526,11 +787,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _minAt = null;
       _dropStartAt = null;
       _angleWindow.clear();
-      // Keep calibration for this patient
     });
   }
 
-  // ---------- UI helpers ----------
+
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -541,145 +801,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // === Calibration dialog (with fine-tune slider restored) ===
-  void _showCalibrationDialog({bool initialAuto = false}) {
-    final currentLeg = _legAngleInPlane(_gFiltered) ?? 180.0;
-    // rawInPlane = 180 - currentLeg
-    final rawInPlane = 180.0 - currentLeg;
-
-    double fineTune = 0.0; // manual override
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSB) {
-          final previewOffset = (-rawInPlane + fineTune).clamp(-30.0, 30.0);
-          final previewLeg = (_baselineAngle - ( (180.0 - currentLeg) + previewOffset )).clamp(0.0, 180.0);
-          return AlertDialog(
-            title: Row(
-              children: [
-                Icon(Icons.tune, color: Theme.of(context).primaryColor),
-                const SizedBox(width: 8),
-                const Expanded(child: Text("Calibrate Extended Position")),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: Column(
-                    children: [
-                      Text("${previewLeg.toStringAsFixed(1)}°",
-                          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.blue)),
-                      const SizedBox(height: 4),
-                      const Text("Current Leg Position", style: TextStyle(fontSize: 14, color: Colors.grey)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text("Fine-tune offset (aim for ~180° when fully extended):"),
-                Slider(
-                  value: fineTune,
-                  min: -30.0,
-                  max: 30.0,
-                  divisions: 60,
-                  label: "${fineTune.toStringAsFixed(1)}°",
-                  onChanged: (v) => setSB(() => fineTune = v),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text("-30°", style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: Colors.orange.shade200),
-                        ),
-                        child: Text("${fineTune.toStringAsFixed(1)}°",
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      ),
-                      Text("+30°", style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.amber.shade200),
-                  ),
-                  child: const Text(
-                    "Keep the device at full extension. After calibrating, flex 5–10° once to define the motion plane.",
-                    style: TextStyle(fontSize: 12, color: Colors.amber, fontStyle: FontStyle.italic),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _resetTest();
-                },
-                child: const Text("Cancel"),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  // finalize offset and persist calibration
-                  setState(() {
-                    _zeroOffsetDeg = (-rawInPlane + fineTune).clamp(-30.0, 30.0);
-                  });
-                  await _saveCalibrationForPatient();
-                  Navigator.pop(context);
-
-                  // Now begin recording with tuned thresholds
-                  setState(() {
-                    _testState = TestState.recording;
-                    _startTime = DateTime.now();
-                    _dropDetected = false;
-                    _reactionDetected = false;
-                    _peakDropAngleDeg = 180.0;
-                    _minLegAngleDeg = _liveAngleDeg ?? 180.0;
-                    _minAt = _startTime;
-                    _dropStartAt = null;
-                    _angleWindow.clear();
-                  });
-
-                  await _preRollNoiseCharacterization();
-
-                  _autoStopTimer = Timer(_maxTestDuration, () {
-                    if (_testState == TestState.recording) {
-                      _stopRecording();
-                      _showSnackBar('Test auto-stopped after ${_maxTestDuration.inSeconds}s', Colors.orange);
-                    }
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green, foregroundColor: Colors.white),
-                child: const Text("Calibrate & Start"),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  // ---------- UI (unchanged from your last version) ----------
   Widget _buildAngleGauge() {
     final angle = _liveAngleDeg ?? 180.0;
     final maxAngle = 180.0;
@@ -828,7 +949,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             ElevatedButton.icon(
-              onPressed: _resetTest,
+              onPressed: _resetTestForNextTrial,
               icon: const Icon(Icons.refresh),
               label: const Text("New Test"),
               style: ElevatedButton.styleFrom(
@@ -847,16 +968,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.grey.shade700)),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(4),
-            ),
+          Expanded(
             child: Text(
-              value,
-              style: TextStyle(fontWeight: FontWeight.bold, color: color),
+              label,
+              style: TextStyle(color: Colors.grey.shade700),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                value,
+                style: TextStyle(fontWeight: FontWeight.bold, color: color),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
         ],
@@ -864,23 +995,119 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildValidationIndicator(String label, bool isValid) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
+  Widget _buildTrialItem(Trial trial) {
+    // Simple kept trial card showing only Drop angle, Motor velocity, and Drop time
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            isValid ? Icons.check_circle : Icons.warning,
-            size: 16,
-            color: isValid ? Colors.green : Colors.orange,
+          Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.green, size: 18),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Drop angle: ${trial.dropAngle?.toStringAsFixed(1) ?? 'N/A'}°',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                trial.formattedTimestamp,
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth > 360) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: _miniMetric('Motor velocity',
+                          trial.motorVelocity != null ? '${trial.motorVelocity!.toStringAsFixed(1)}°/s' : 'N/A'),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _miniMetric('Drop time',
+                          trial.dropTimeMs != null ? '${trial.dropTimeMs!.toStringAsFixed(0)} ms' : 'N/A'),
+                    ),
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _miniMetric('Motor velocity',
+                      trial.motorVelocity != null ? '${trial.motorVelocity!.toStringAsFixed(1)}°/s' : 'N/A'),
+                  const SizedBox(height: 6),
+                  _miniMetric('Drop time',
+                      trial.dropTimeMs != null ? '${trial.dropTimeMs!.toStringAsFixed(0)} ms' : 'N/A'),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniMetric(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(label,
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade700), overflow: TextOverflow.ellipsis),
           ),
           const SizedBox(width: 8),
+          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrialMetric(String label, String value, MaterialColor color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.shade50,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
           Text(
             label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isValid ? Colors.green : Colors.orange,
-            ),
+            style: TextStyle(fontSize: 9, color: color.shade600, fontWeight: FontWeight.w500),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+          const SizedBox(height: 1),
+          Text(
+            value,
+            style: TextStyle(fontSize: 11, color: color.shade800, fontWeight: FontWeight.bold),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
         ],
       ),
@@ -929,12 +1156,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    // === Your original UI (unchanged) ===
     return Scaffold(
       appBar: AppBar(
         title: const Text('Leg Drop Test'),
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.tune),
+            tooltip: 'Fine-tune Calibration',
+            onPressed: _toggleCalibrationSlider,
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: _buildSignalQuality(),
@@ -990,6 +1221,111 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ),
 
+            // Calibration Slider
+            if (_showCalibrationSlider) ...[
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.tune, color: Theme.of(context).primaryColor),
+                          const SizedBox(width: 8),
+                          const Text("Fine-tune Calibration", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              "${(_liveAngleDeg ?? 0.0).toStringAsFixed(1)}°",
+                              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.blue),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text("Current Live Angle", style: TextStyle(fontSize: 14, color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text("Adjust offset to make current angle read 180°:"),
+                      const SizedBox(height: 8),
+                      Slider(
+                        value: _zeroOffsetDeg,
+                        min: -30.0,
+                        max: 30.0,
+                        divisions: 120,
+                        label: "${_zeroOffsetDeg.toStringAsFixed(1)}°",
+                        onChanged: _adjustCalibration,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text("-30°", style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: Colors.orange.shade200),
+                              ),
+                              child: Text("${_zeroOffsetDeg.toStringAsFixed(1)}°",
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                            Text("+30°", style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.amber.shade200),
+                        ),
+                        child: const Text(
+                          "Adjust the slider until the live angle shows 180° when your leg is fully extended.",
+                          style: TextStyle(fontSize: 12, color: Colors.amber, fontStyle: FontStyle.italic),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            await _saveCalibrationToDatabase();
+                            if (mounted) {
+                              setState(() { _showCalibrationSlider = false; });
+                              _showSnackBar('Calibration saved', Colors.green);
+                            }
+                          },
+                          icon: const Icon(Icons.check),
+                          label: const Text('Done'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+
             // Angle Display
             Card(
               child: Padding(
@@ -1021,7 +1357,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               children: [
                                 Icon(Icons.trending_down, color: Colors.orange.shade700, size: 20),
                                 const SizedBox(width: 8),
-                                const Text("Minimum Angle:", style: TextStyle(fontWeight: FontWeight.bold)),
+                                Expanded(
+                                  child: Text(
+                                    "Minimum Angle:",
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
                               ],
                             ),
                             Text(
@@ -1060,6 +1402,62 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ),
 
+            // Kept Trials Section
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "Kept Trials (${_keptTrials.length})",
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (_keptTrials.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.grey, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'No kept trials yet. Complete tests and choose to keep them.',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontStyle: FontStyle.italic,
+                                  fontSize: 12,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ..._keptTrials.map((trial) => _buildTrialItem(trial)),
+                  ],
+                ),
+              ),
+            ),
+
             // Results Display
             if (_testState == TestState.completed || _dropAngle != null || widget.patient.dropAngle != null)
               Card(
@@ -1080,40 +1478,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       _buildResultRow("Minimum Angle", "${_peakDropAngleDeg?.toStringAsFixed(2) ?? '--'}°", Colors.blue),
                       _buildResultRow("Drop Time", "${_dropTime?.inMilliseconds ?? widget.patient.dropTimeMs?.toInt() ?? '--'} ms", Colors.orange),
                       _buildResultRow("Motor Velocity", "${_motorVelocity?.toStringAsFixed(2) ?? widget.patient.motorVelocity?.toStringAsFixed(2) ?? '--'} °/s", Colors.green),
-
-                      const SizedBox(height: 12),
-                      if (_dropAngle != null) ...[
-                        _buildValidationIndicator("Drop Range", _dropAngle! >= _minValidDropAngle && _dropAngle! <= _maxValidDropAngle),
-                        _buildValidationIndicator("Signal Quality", _signalQuality != SignalQuality.poor),
-                        _buildValidationIndicator("Time Range", (_dropTime?.inMilliseconds ?? 0) >= 100 && (_dropTime?.inMilliseconds ?? 0) <= 2000),
-                      ],
                     ],
                   ),
                 ),
               ),
-
-            // Technical Info (Collapsible)
-            Card(
-              child: ExpansionTile(
-                leading: Icon(Icons.info_outline, color: Theme.of(context).primaryColor),
-                title: const Text("Technical Details"),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text("Mode: Sagittal-plane (axis-agnostic within plane)"),
-                        Text("Sample Rate: $_sampleRate Hz (Target: 1000 Hz)"),
-                        Text("Signal Quality: ${_signalQuality.name.toUpperCase()}"),
-                        Text("Legacy Z Tilt: ${_tiltZ?.toStringAsFixed(2) ?? '--'}°"),
-                        Text("Zero Offset: ${_zeroOffsetDeg.toStringAsFixed(2)}°"),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),
