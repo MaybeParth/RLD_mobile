@@ -489,7 +489,7 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
         }
       }
     } catch (e) {
-      print('Error loading calibration: $e');
+      // print('Error loading calibration: $e');
     }
   }
 
@@ -502,9 +502,7 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
           ..sort((a, b) {
             final at = a.timestamp;
             final bt = b.timestamp;
-            if (at != null && bt != null) {
-              return bt.compareTo(at);
-            }
+            if (at != null && bt != null) return bt.compareTo(at);
             return b.id.compareTo(a.id);
           });
         setState(() {
@@ -512,7 +510,7 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
         });
       }
     } catch (e) {
-      print('Error loading kept trials: $e');
+      // print('Error loading kept trials: $e');
     }
   }
 
@@ -524,7 +522,7 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
   }
 
   void _adjustCalibration(double newOffset) async {
-    print('Adjusting calibration to: $newOffset');
+    // print('Adjusting calibration to: $newOffset');
     setState(() {
       _zeroOffsetDeg = newOffset;
     });
@@ -552,9 +550,9 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
         u: [_planeU!.x, _planeU!.y, _planeU!.z],
         v: [_planeV!.x, _planeV!.y, _planeV!.z],
       );
-      print('Calibration saved: offset=${_zeroOffsetDeg.toStringAsFixed(2)}°');
+      // print('Calibration saved: offset=${_zeroOffsetDeg.toStringAsFixed(2)}°');
     } catch (e) {
-      print('Error saving calibration: $e');
+      // print('Error saving calibration: $e');
     }
   }
 
@@ -854,32 +852,32 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
   }
 
   Future<void> _handleTrialDecision(Trial trial, bool isKept, {String? notes}) async {
-    print('Handling trial decision: isKept=$isKept');
+    // print('Handling trial decision: isKept=$isKept');
     try {
       // Add trial to database
-      print('Adding trial to database...');
+      // print('Adding trial to database...');
       await PatientDatabase.addTrialToPatient(widget.patient.id, trial);
       
       if (isKept) {
         // Update trial status to kept
-        print('Updating trial status to kept...');
+        // print('Updating trial status to kept...');
         await PatientDatabase.updateTrialStatus(widget.patient.id, trial.id, true, notes: notes);
         _showSnackBar(notes != null ? 'Trial kept with notes and saved' : 'Trial kept and saved', Colors.green);
       } else {
         // Update trial status to discarded
-        print('Updating trial status to discarded...');
+        // print('Updating trial status to discarded...');
         await PatientDatabase.updateTrialStatus(widget.patient.id, trial.id, false, discardReason: 'User discarded');
         _showSnackBar('Trial discarded', Colors.orange);
       }
       
       // Refresh kept trials and reset test for next trial
-      print('Refreshing kept trials and resetting test...');
+      // print('Refreshing kept trials and resetting test...');
       await _loadKeptTrials();
       _resetTestForNextTrial();
-      print('Trial decision handling complete - staying on test screen');
+      // print('Trial decision handling complete - staying on test screen');
       
     } catch (e) {
-      print('Error in trial decision: $e');
+      // print('Error in trial decision: $e');
       _showSnackBar('Error saving trial: $e', Colors.red);
     }
   }

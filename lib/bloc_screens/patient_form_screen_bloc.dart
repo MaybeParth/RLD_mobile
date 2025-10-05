@@ -185,135 +185,16 @@ class _PatientFormScreenBlocState extends State<PatientFormScreenBloc> {
     );
   }
 
-  Widget _buildEnhancedTextField(
-    String label,
-    TextEditingController controller, {
-    int maxLines = 1,
-    TextInputType keyboardType = TextInputType.text,
-    String? Function(String?)? validator,
-    IconData? icon,
-    List<TextInputFormatter>? inputFormatters,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TextFormField(
-        controller: controller,
-        maxLines: maxLines,
-        keyboardType: keyboardType,
-        validator: validator,
-        inputFormatters: inputFormatters,
-        style: const TextStyle(fontSize: 20),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey.shade700,
-          ),
-          prefixIcon: icon != null ? Icon(icon, color: Colors.blue.shade600) : null,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.red, width: 2),
-          ),
-          focusedErrorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.red, width: 2),
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGenderDropdown() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: DropdownButtonFormField<String>(
-        value: _selectedGender,
-        onChanged: (String? newValue) {
-          setState(() {
-            _selectedGender = newValue!;
-          });
-        },
-        style: const TextStyle(fontSize: 20, color: Colors.black87),
-        decoration: InputDecoration(
-          labelText: 'Gender',
-          labelStyle: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey.shade700,
-          ),
-          prefixIcon: Icon(Icons.person_outline, color: Colors.blue.shade600),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        ),
-        items: <String>['Male', 'Female', 'Non-Binary', 'Prefer not to say']
-            .map<DropdownMenuItem<String>>((String value) {
-          return DropdownMenuItem<String>(
-            value: value,
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 20),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
+  
 
   void _submitForm() {
     if (_formKey.currentState?.validate() == true) {
-      print('🔍 Creating new patient...');
-      print('ID: ${_idController.text}');
-      print('Name: ${_nameController.text}');
-      print('Age: ${_ageController.text}');
-      print('Gender: $_selectedGender');
-      print('Condition: ${_commentsController.text}');
+      // print('🔍 Creating new patient...');
+      // print('ID: ${_idController.text}');
+      // print('Name: ${_nameController.text}');
+      // print('Age: ${_ageController.text}');
+      // print('Gender: $_selectedGender');
+      // print('Condition: ${_commentsController.text}');
       
       final patient = Patient(
         id: _idController.text,

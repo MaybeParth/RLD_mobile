@@ -99,7 +99,7 @@ class TestBloc extends Bloc<TestEvent, TestState> {
 
       // Capture stable reference
       final gRef = await _captureStableReference();
-      print('🔍 Calibration: gRef captured = $gRef');
+      // print('🔍 Calibration: gRef captured = $gRef');
       emit(state.copyWith(gRef: gRef));
 
       // Wait a moment before flex capture
@@ -108,8 +108,7 @@ class TestBloc extends Bloc<TestEvent, TestState> {
       // Capture flex and build plane
       final planeData = await _captureFlexAndBuildPlane();
       if (planeData != null) {
-        print(
-            '🔍 Calibration: planeU = ${planeData['u']}, planeV = ${planeData['v']}');
+        // print('🔍 Calibration: planeU = ${planeData['u']}, planeV = ${planeData['v']}');
 
         // After plane definition, we need to capture the baseline angle
         // This is where the user sets their own starting position
@@ -122,10 +121,9 @@ class TestBloc extends Bloc<TestEvent, TestState> {
           status: TestStatus.ready,
           errorMessage: null, // Clear any errors on success
         ));
-        print(
-            '🔍 Calibration: Complete! Baseline angle set to ${baselineAngle.toStringAsFixed(1)}°. Ready for testing.');
+        // print('🔍 Calibration: Complete! Baseline angle set to ${baselineAngle.toStringAsFixed(1)}°. Ready for testing.');
       } else {
-        print('❌ Calibration: Failed to build plane');
+        // print('❌ Calibration: Failed to build plane');
         emit(state.copyWith(
           status: TestStatus.idle,
           errorMessage:
@@ -261,14 +259,13 @@ class TestBloc extends Bloc<TestEvent, TestState> {
       _recentDrops.removeAt(0);
     }
 
-    print('🔍 Drop Measurement:');
-    print('   Starting angle (baseline): ${startingAngle.toStringAsFixed(1)}°');
-    print('   Minimum angle reached: ${minLeg.toStringAsFixed(1)}°');
-    print('   Raw drop: ${rawDropAngle.toStringAsFixed(1)}°');
-    print('   Validated drop: ${actualDropAngle.toStringAsFixed(1)}°');
-    print('   Stability: ${(_angleVariance * 100).toStringAsFixed(1)}%');
-    print(
-        '   Recent drops: ${_recentDrops.map((d) => d.toStringAsFixed(1)).join(', ')}');
+    // print('🔍 Drop Measurement:');
+    // print('   Starting angle (baseline): ${startingAngle.toStringAsFixed(1)}°');
+    // print('   Minimum angle reached: ${minLeg.toStringAsFixed(1)}°');
+    // print('   Raw drop: ${rawDropAngle.toStringAsFixed(1)}°');
+    // print('   Validated drop: ${actualDropAngle.toStringAsFixed(1)}°');
+    // print('   Stability: ${(_angleVariance * 100).toStringAsFixed(1)}%');
+    // print('   Recent drops: ...');
 
     // Calculate drop time
     Duration? dropTime;
@@ -282,8 +279,7 @@ class TestBloc extends Bloc<TestEvent, TestState> {
         ? (actualDropAngle / (dropTime.inMilliseconds / 1000.0))
         : 0.0;
 
-    print(
-        '🔍 Trial results: actualDropAngle=${actualDropAngle.toStringAsFixed(1)}°, dropTime=$dropTime, motorVelocity=${motorVelocity.toStringAsFixed(1)}°/s');
+    // print('🔍 Trial results: ...');
 
     // Update the current trial with the actual drop measurement
     final updatedTrial = state.currentTrial?.copyWith(
@@ -382,8 +378,7 @@ class TestBloc extends Bloc<TestEvent, TestState> {
 
     // Debug logging (only occasionally to avoid spam)
     if (_sampleCount % 50 == 0) {
-      print(
-          '🔍 Live angle: raw=$leg, cleaned=$cleanedAngle, smoothed=$smoothed');
+      // print('🔍 Live angle: raw=$leg, cleaned=$cleanedAngle, smoothed=$smoothed');
     }
 
     return smoothed;
@@ -433,13 +428,11 @@ class TestBloc extends Bloc<TestEvent, TestState> {
     // Ensure the angle is within reasonable bounds (0-180 degrees)
     final finalAngle = adjustedAngle.clamp(0.0, 180.0);
 
-    print(
-        '🔍 Angle calculation: refU=$refU, refV=$refV, curU=$curU, curV=$curV');
-    print(
-        '🔍 Dot product: $dotProduct, Angle between vectors: $angleBetweenVectors');
-    print('🔍 Leg angle: $legAngle, zeroOffset: ${state.zeroOffsetDeg}');
-    print('🔍 Adjusted angle: $adjustedAngle, Final leg angle: $finalAngle');
-    print('🔍 Custom baseline: ${state.customBaselineAngle}');
+    // print('🔍 Angle calculation: refU=$refU, refV=$refV, curU=$curU, curV=$curV');
+    // print('🔍 Dot product: $dotProduct, Angle between vectors: $angleBetweenVectors');
+    // print('🔍 Leg angle: $legAngle, zeroOffset: ${state.zeroOffsetDeg}');
+    // print('🔍 Adjusted angle: $adjustedAngle, Final leg angle: $finalAngle');
+    // print('🔍 Custom baseline: ${state.customBaselineAngle}');
 
     return finalAngle;
   }
@@ -486,7 +479,7 @@ class TestBloc extends Bloc<TestEvent, TestState> {
     // Use more lenient threshold for live angle (5 MADs instead of 3)
     // Only remove extreme outliers to maintain responsiveness
     if ((angle - median).abs() > 5 * mad && mad > 0.1) {
-      print('🚨 Extreme outlier detected: $angle (median: $median, MAD: $mad)');
+      // print('🚨 Extreme outlier detected: $angle (median: $median, MAD: $mad)');
       return median; // Return median instead of outlier
     }
 
@@ -498,19 +491,19 @@ class TestBloc extends Bloc<TestEvent, TestState> {
       double rawDrop, double startingAngle, double minAngle) {
     // Basic sanity checks
     if (rawDrop < 0 || rawDrop > 180) {
-      print('⚠️ Invalid drop angle: $rawDrop, using 0');
+      // print('⚠️ Invalid drop angle: $rawDrop, using 0');
       return 0.0;
     }
 
     // Check if the drop is too small (likely noise)
     if (rawDrop < 2.0) {
-      print('⚠️ Drop too small (${rawDrop.toStringAsFixed(1)}°), likely noise');
+      // print('⚠️ Drop too small (${rawDrop.toStringAsFixed(1)}°), likely noise');
       return 0.0;
     }
 
     // Check if the drop is too large (likely error)
     if (rawDrop > 90.0) {
-      print('⚠️ Drop too large (${rawDrop.toStringAsFixed(1)}°), likely error');
+      // print('⚠️ Drop too large (${rawDrop.toStringAsFixed(1)}°), likely error');
       return 90.0; // Cap at 90 degrees
     }
 
@@ -522,8 +515,7 @@ class TestBloc extends Bloc<TestEvent, TestState> {
 
       // If this drop is very different from recent ones, apply smoothing
       if (deviation > 15.0 && _recentDrops.length >= 3) {
-        print(
-            '⚠️ Inconsistent drop: ${rawDrop.toStringAsFixed(1)}° vs recent avg ${avgRecent.toStringAsFixed(1)}°');
+        // print('⚠️ Inconsistent drop: ${rawDrop.toStringAsFixed(1)}° vs recent avg ${avgRecent.toStringAsFixed(1)}°');
         // Blend with recent average for consistency
         return (rawDrop * 0.3) + (avgRecent * 0.7);
       }
@@ -531,8 +523,7 @@ class TestBloc extends Bloc<TestEvent, TestState> {
 
     // Check stability of the measurement
     if (_angleVariance < 0.3) {
-      print(
-          '⚠️ Low stability (${(_angleVariance * 100).toStringAsFixed(1)}%), applying conservative adjustment');
+      // print('⚠️ Low stability ... applying conservative adjustment');
       // If stability is low, be more conservative
       return rawDrop * 0.9; // Slightly reduce the measurement
     }
@@ -556,7 +547,7 @@ class TestBloc extends Bloc<TestEvent, TestState> {
     // Lower standard deviation = higher quality
     final quality = (1.0 - (stdDev / 10.0)).clamp(0.0, 1.0);
 
-    print('🔍 Sensor quality: stdDev=$stdDev, quality=$quality');
+    // print('🔍 Sensor quality: stdDev=$stdDev, quality=$quality');
     return quality;
   }
 
@@ -578,14 +569,12 @@ class TestBloc extends Bloc<TestEvent, TestState> {
       final accelDip = _accelMag < thresholds['accelDip']!;
       final fallbackFast = _omegaDegPerSec < -(thresholds['omegaDrop']! * 0.7);
 
-      print(
-          '🔍 Drop detection: liveAngle=${state.liveAngle}, gyroInPlane=$gyroInPlaneDeg, omegaDegPerSec=$_omegaDegPerSec');
-      print(
-          '🔍 Conditions: fastDown=$fastDown, accelDip=$accelDip, fallbackFast=$fallbackFast');
-      print('🔍 Adaptive thresholds: $thresholds');
+      // print('🔍 Drop detection: ...');
+      // print('🔍 Conditions: ...');
+      // print('🔍 Adaptive thresholds: $thresholds');
 
       if ((fastDown && accelDip) || (fallbackFast && accelDip)) {
-        print('🎯 DROP DETECTED!');
+        // print('🎯 DROP DETECTED!');
         add(DetectDrop(
           peakAngle: state.liveAngle ?? state.customBaselineAngle,
           timestamp: DateTime.now(),
@@ -663,8 +652,7 @@ class TestBloc extends Bloc<TestEvent, TestState> {
             final stability = _checkStability(recentSamples);
 
             if (stability < 0.8) {
-              print(
-                  '⚠️ Movement detected during reference capture: stability=$stability');
+              // print('⚠️ Movement detected during reference capture: stability=$stability');
               // Don't fail immediately, but warn
             }
           }
@@ -678,8 +666,7 @@ class TestBloc extends Bloc<TestEvent, TestState> {
               return;
             }
 
-            print(
-                '🔧 Captured stable reference: ${sum.normalized()} (${got} samples, stability: $finalStability)');
+            // print('🔧 Captured stable reference: ${sum.normalized()} (${got} samples, stability: $finalStability)');
             c.complete(sum.normalized());
           }
         }
@@ -726,7 +713,7 @@ class TestBloc extends Bloc<TestEvent, TestState> {
 
   // Capture the baseline angle after plane definition with quality validation
   Future<double> _captureBaselineAngle({int samples = 50}) async {
-    print('🔧 Capturing baseline angle with quality validation...');
+    // print('🔧 Capturing baseline angle with quality validation...');
 
     // Wait a moment for user to position their leg
     await Future.delayed(const Duration(milliseconds: 1500));
@@ -757,16 +744,12 @@ class TestBloc extends Bloc<TestEvent, TestState> {
             final quality = _validateBaselineQuality(angleSamples);
 
             if (quality > 0.7) {
-              // High quality baseline
+              // print('✅ High quality baseline: ${avgAngle.toStringAsFixed(1)}° (quality: ${(quality * 100).toStringAsFixed(1)}%)');
               final avgAngle =
                   angleSamples.reduce((a, b) => a + b) / angleSamples.length;
-              print(
-                  '✅ High quality baseline: ${avgAngle.toStringAsFixed(1)}° (quality: ${(quality * 100).toStringAsFixed(1)}%)');
               c.complete(avgAngle);
             } else {
-              // Low quality - try again with more samples
-              print(
-                  '⚠️ Low quality baseline (${(quality * 100).toStringAsFixed(1)}%), collecting more samples...');
+              // print('⚠️ Low quality baseline (${(quality * 100).toStringAsFixed(1)}%), collecting more samples...');
               if (angleSamples.length < samples * 2) {
                 // Continue collecting more samples
                 return;
@@ -774,8 +757,7 @@ class TestBloc extends Bloc<TestEvent, TestState> {
                 // Use the best we have
                 final avgAngle =
                     angleSamples.reduce((a, b) => a + b) / angleSamples.length;
-                print(
-                    '⚠️ Using baseline despite low quality: ${avgAngle.toStringAsFixed(1)}°');
+                // print('⚠️ Using baseline despite low quality: ${avgAngle.toStringAsFixed(1)}°');
                 c.complete(avgAngle);
               }
             }
@@ -1026,14 +1008,14 @@ class TestBloc extends Bloc<TestEvent, TestState> {
   }
 
   void _onAdjustCalibration(AdjustCalibration event, Emitter<TestState> emit) {
-    print('🔧 Adjusting calibration: zeroOffsetDeg = ${event.zeroOffsetDeg}');
+    // print('🔧 Adjusting calibration: zeroOffsetDeg = ${event.zeroOffsetDeg}');
     emit(state.copyWith(
       zeroOffsetDeg: event.zeroOffsetDeg,
     ));
   }
 
   void _onSetManualBaseline(SetManualBaseline event, Emitter<TestState> emit) {
-    print('🔧 Setting manual baseline: ${event.baselineAngle}°');
+    // print('🔧 Setting manual baseline: ${event.baselineAngle}°');
     emit(state.copyWith(
       customBaselineAngle: event.baselineAngle,
       status: TestStatus.ready,

@@ -151,8 +151,7 @@ class Patient {
               .toList();
         }
       } catch (e) {
-        // If parsing fails, return empty list
-        print('Warning: Failed to parse trials data: $e');
+        // print('Warning: Failed to parse trials data: $e');
         trials = [];
       }
     }
