@@ -148,9 +148,9 @@ class QuickReferenceCard extends StatelessWidget {
   }
 
   bool _hasAdditionalInfo() {
-    return currentStep == 'calibration_hold' || 
-           currentStep == 'test_recording' ||
-           currentStep == 'calibration_flex';
+    return currentStep == 'calibration_hold' ||
+        currentStep == 'test_recording' ||
+        currentStep == 'calibration_flex';
   }
 
   String _getAdditionalInfo() {
@@ -166,5 +166,3 @@ class QuickReferenceCard extends StatelessWidget {
     }
   }
 }
-
-

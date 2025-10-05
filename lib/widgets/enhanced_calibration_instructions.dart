@@ -21,7 +21,8 @@ class EnhancedCalibrationInstructions extends StatelessWidget {
             _buildStep(
               step: 1,
               title: 'Device Placement',
-              description: 'Securely attach the device to your leg using the provided strap. Make sure it\'s tight enough to prevent movement but not uncomfortable.',
+              description:
+                  'Securely attach the device to your leg using the provided strap. Make sure it\'s tight enough to prevent movement but not uncomfortable.',
               icon: Icons.phone_android,
               color: Colors.blue,
             ),
@@ -29,7 +30,8 @@ class EnhancedCalibrationInstructions extends StatelessWidget {
             _buildStep(
               step: 2,
               title: 'Starting Position',
-              description: 'Hold your leg in your normal extended position. This will be your reference point (0°). If you have extension lag, this is fine - we\'ll adjust for it later.',
+              description:
+                  'Hold your leg in your normal extended position. This will be your reference point (0°). If you have extension lag, this is fine - we\'ll adjust for it later.',
               icon: Icons.straighten,
               color: Colors.green,
             ),
@@ -37,7 +39,8 @@ class EnhancedCalibrationInstructions extends StatelessWidget {
             _buildStep(
               step: 3,
               title: 'Hold Still (10 seconds)',
-              description: 'Keep your leg completely still for 10 seconds. The device needs to capture a stable reference. Any movement will cause calibration to fail.',
+              description:
+                  'Keep your leg completely still for 10 seconds. The device needs to capture a stable reference. Any movement will cause calibration to fail.',
               icon: Icons.pause_circle,
               color: Colors.orange,
             ),
@@ -45,7 +48,8 @@ class EnhancedCalibrationInstructions extends StatelessWidget {
             _buildStep(
               step: 4,
               title: 'Gentle Flex (5-20°)',
-              description: 'Slowly bend your knee about 5-20 degrees. Move only your knee - avoid twisting or moving your hip. Think of it like a gentle knee bend.',
+              description:
+                  'Slowly bend your knee about 5-20 degrees. Move only your knee - avoid twisting or moving your hip. Think of it like a gentle knee bend.',
               icon: Icons.trending_down,
               color: Colors.red,
             ),
@@ -53,7 +57,8 @@ class EnhancedCalibrationInstructions extends StatelessWidget {
             _buildStep(
               step: 5,
               title: 'Hold Flex Position',
-              description: 'Hold the flexed position for 3 seconds, then return to your starting position. This helps the device understand your leg\'s movement plane.',
+              description:
+                  'Hold the flexed position for 3 seconds, then return to your starting position. This helps the device understand your leg\'s movement plane.',
               icon: Icons.timer,
               color: Colors.purple,
             ),
@@ -148,5 +153,3 @@ class EnhancedCalibrationInstructions extends StatelessWidget {
     );
   }
 }
-
-

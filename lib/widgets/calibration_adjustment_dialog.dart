@@ -13,10 +13,12 @@ class CalibrationAdjustmentDialog extends StatefulWidget {
   });
 
   @override
-  State<CalibrationAdjustmentDialog> createState() => _CalibrationAdjustmentDialogState();
+  State<CalibrationAdjustmentDialog> createState() =>
+      _CalibrationAdjustmentDialogState();
 }
 
-class _CalibrationAdjustmentDialogState extends State<CalibrationAdjustmentDialog> {
+class _CalibrationAdjustmentDialogState
+    extends State<CalibrationAdjustmentDialog> {
   late double _zeroOffset;
   late double _displayedAngle;
 
@@ -70,7 +72,8 @@ class _CalibrationAdjustmentDialogState extends State<CalibrationAdjustmentDialo
               children: [
                 Text(
                   'Current Angle: ${_displayedAngle.toStringAsFixed(1)}°',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -81,11 +84,11 @@ class _CalibrationAdjustmentDialogState extends State<CalibrationAdjustmentDialo
             ),
           ),
           const SizedBox(height: 16),
-                  Text(
-                    'Move your leg to test the angle reading. Adjust the zero offset until the angle shows realistic values.\n'
-                    '180° = extended leg, angles decrease as you drop.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
+          Text(
+            'Move your leg to test the angle reading. Adjust the zero offset until the angle shows realistic values.\n'
+            '180° = extended leg, angles decrease as you drop.',
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
         ],
       ),
       actions: [

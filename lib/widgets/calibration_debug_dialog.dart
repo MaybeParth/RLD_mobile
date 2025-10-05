@@ -31,13 +31,14 @@ class _CalibrationDebugDialogState extends State<CalibrationDebugDialog> {
     try {
       // Test accelerometer access
       motionSensors.accelerometerUpdateInterval = 1000;
-      
+
       final sub = motionSensors.accelerometer.listen((e) {
         setState(() {
           _lastAcceleration = Vector3(e.x, e.y, e.z);
           _sampleCount++;
           _status = 'Sensors working! Samples: ${_sampleCount.toInt()}';
-          _logs.add('Accel: ${e.x.toStringAsFixed(2)}, ${e.y.toStringAsFixed(2)}, ${e.z.toStringAsFixed(2)}');
+          _logs.add(
+              'Accel: ${e.x.toStringAsFixed(2)}, ${e.y.toStringAsFixed(2)}, ${e.z.toStringAsFixed(2)}');
         });
       });
 
@@ -45,10 +46,10 @@ class _CalibrationDebugDialogState extends State<CalibrationDebugDialog> {
       Future.delayed(const Duration(seconds: 5), () {
         sub.cancel();
         setState(() {
-          _status = 'Sensor test complete. Samples received: ${_sampleCount.toInt()}';
+          _status =
+              'Sensor test complete. Samples received: ${_sampleCount.toInt()}';
         });
       });
-
     } catch (e) {
       setState(() {
         _status = 'Sensor error: $e';

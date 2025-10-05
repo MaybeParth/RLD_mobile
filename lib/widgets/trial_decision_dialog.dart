@@ -58,10 +58,11 @@ class _TrialDecisionDialogState extends State<TrialDecisionDialog> {
                 children: [
                   Text(
                     'Trial ${widget.trial.id} Results',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  
+
                   // Show actual drop measurement prominently
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -75,7 +76,8 @@ class _TrialDecisionDialogState extends State<TrialDecisionDialog> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.trending_down, color: Colors.red.shade700, size: 24),
+                            Icon(Icons.trending_down,
+                                color: Colors.red.shade700, size: 24),
                             const SizedBox(width: 8),
                             Text(
                               'Leg Dropped: ${widget.trial.dropAngle?.toStringAsFixed(1) ?? 'N/A'}°',
@@ -100,14 +102,23 @@ class _TrialDecisionDialogState extends State<TrialDecisionDialog> {
                       ],
                     ),
                   ),
-                  
+
                   const SizedBox(height: 12),
-                  
+
                   // Additional measurements
-                  _buildResultRow('Peak Drop Angle', '${widget.trial.peakDropAngle?.toStringAsFixed(1) ?? 'N/A'}°', Colors.orange),
-                  _buildResultRow('Drop Time', '${widget.trial.dropTimeMs?.toStringAsFixed(0) ?? 'N/A'} ms', Colors.blue),
+                  _buildResultRow(
+                      'Peak Drop Angle',
+                      '${widget.trial.peakDropAngle?.toStringAsFixed(1) ?? 'N/A'}°',
+                      Colors.orange),
+                  _buildResultRow(
+                      'Drop Time',
+                      '${widget.trial.dropTimeMs?.toStringAsFixed(0) ?? 'N/A'} ms',
+                      Colors.blue),
                   if (widget.trial.motorVelocity != null)
-                    _buildResultRow('Motor Velocity', '${widget.trial.motorVelocity!.toStringAsFixed(1)} °/s', Colors.green),
+                    _buildResultRow(
+                        'Motor Velocity',
+                        '${widget.trial.motorVelocity!.toStringAsFixed(1)} °/s',
+                        Colors.green),
                   const SizedBox(height: 8),
                   Text(
                     'Completed at ${widget.trial.formattedTimestamp}',
@@ -116,9 +127,9 @@ class _TrialDecisionDialogState extends State<TrialDecisionDialog> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Instructions for patient
             Container(
               padding: const EdgeInsets.all(12),
@@ -156,17 +167,17 @@ class _TrialDecisionDialogState extends State<TrialDecisionDialog> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Decision question
             const Text(
               'What would you like to do with this trial?',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Notes field (optional)
             if (_showNotesField) ...[
               TextField(
@@ -193,7 +204,7 @@ class _TrialDecisionDialogState extends State<TrialDecisionDialog> {
           icon: const Icon(Icons.delete, color: Colors.red),
           label: const Text('Discard', style: TextStyle(color: Colors.red)),
         ),
-        
+
         // Keep button
         ElevatedButton.icon(
           onPressed: () {
@@ -211,7 +222,7 @@ class _TrialDecisionDialogState extends State<TrialDecisionDialog> {
             foregroundColor: Colors.white,
           ),
         ),
-        
+
         // Add notes button
         if (!_showNotesField)
           TextButton.icon(

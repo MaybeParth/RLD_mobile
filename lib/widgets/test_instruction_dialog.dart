@@ -39,20 +39,22 @@ class _TestInstructionDialogState extends State<TestInstructionDialog> {
           ],
         ),
       ),
-      actions: widget.isRecording ? null : [
-        TextButton(
-          onPressed: widget.onCancel,
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: widget.onStart,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('Start Test'),
-        ),
-      ],
+      actions: widget.isRecording
+          ? null
+          : [
+              TextButton(
+                onPressed: widget.onCancel,
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: widget.onStart,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Start Test'),
+              ),
+            ],
     );
   }
 
@@ -89,27 +91,22 @@ class _TestInstructionDialogState extends State<TestInstructionDialog> {
           style: TextStyle(fontSize: 16),
         ),
         const SizedBox(height: 16),
-        
         _buildInstructionItem(
           icon: Icons.timer,
           text: 'Wait for the "RECORDING" signal before moving',
         ),
-        
         _buildInstructionItem(
           icon: Icons.trending_down,
           text: 'Let your leg drop naturally as fast as possible',
         ),
-        
         _buildInstructionItem(
           icon: Icons.speed,
           text: 'The system will measure your drop angle in degrees',
         ),
-        
         _buildInstructionItem(
           icon: Icons.trending_up,
           text: 'Kick your leg back to 180° extended position quickly',
         ),
-        
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(12),
@@ -151,7 +148,6 @@ class _TestInstructionDialogState extends State<TestInstructionDialog> {
           style: TextStyle(fontSize: 16),
         ),
         const SizedBox(height: 16),
-        
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -237,7 +233,7 @@ class _TestInstructionDialogState extends State<TestInstructionDialog> {
   Widget _buildStatusIndicator() {
     Color statusColor;
     String statusText;
-    
+
     switch (widget.currentPhase) {
       case 'ready':
         statusColor = Colors.blue;
@@ -255,7 +251,7 @@ class _TestInstructionDialogState extends State<TestInstructionDialog> {
         statusColor = Colors.grey;
         statusText = 'Unknown';
     }
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(

@@ -2,7 +2,15 @@ import 'package:equatable/equatable.dart';
 import 'package:vector_math/vector_math_64.dart';
 import '../../models/trial.dart';
 
-enum TestStatus { idle, calibrating, ready, recording, completed, trialCompleted, testingEnded }
+enum TestStatus {
+  idle,
+  calibrating,
+  ready,
+  recording,
+  completed,
+  trialCompleted,
+  testingEnded
+}
 
 class TestState extends Equatable {
   final TestStatus status;
@@ -24,14 +32,14 @@ class TestState extends Equatable {
   final DateTime? dropStartAt;
   final double? minLegAngleDeg;
   final DateTime? minAt;
-  
+
   // Trial management
   final List<Trial> trials;
   final int currentTrialNumber;
   final Trial? currentTrial;
   final double customBaselineAngle;
   final bool showTrialDecisionDialog;
-  
+
   const TestState({
     this.status = TestStatus.idle,
     this.liveAngle,
@@ -58,35 +66,35 @@ class TestState extends Equatable {
     this.customBaselineAngle = 180.0,
     this.showTrialDecisionDialog = false,
   });
-  
+
   @override
   List<Object?> get props => [
-    status,
-    liveAngle,
-    peakDropAngle,
-    dropAngle,
-    dropTime,
-    motorVelocity,
-    signalQuality,
-    dropDetected,
-    reactionDetected,
-    startTime,
-    endTime,
-    gRef,
-    planeU,
-    planeV,
-    zeroOffsetDeg,
-    errorMessage,
-    dropStartAt,
-    minLegAngleDeg,
-    minAt,
-    trials,
-    currentTrialNumber,
-    currentTrial,
-    customBaselineAngle,
-    showTrialDecisionDialog,
-  ];
-  
+        status,
+        liveAngle,
+        peakDropAngle,
+        dropAngle,
+        dropTime,
+        motorVelocity,
+        signalQuality,
+        dropDetected,
+        reactionDetected,
+        startTime,
+        endTime,
+        gRef,
+        planeU,
+        planeV,
+        zeroOffsetDeg,
+        errorMessage,
+        dropStartAt,
+        minLegAngleDeg,
+        minAt,
+        trials,
+        currentTrialNumber,
+        currentTrial,
+        customBaselineAngle,
+        showTrialDecisionDialog,
+      ];
+
   TestState copyWith({
     TestStatus? status,
     double? liveAngle,
@@ -137,20 +145,22 @@ class TestState extends Equatable {
       currentTrialNumber: currentTrialNumber ?? this.currentTrialNumber,
       currentTrial: currentTrial ?? this.currentTrial,
       customBaselineAngle: customBaselineAngle ?? this.customBaselineAngle,
-      showTrialDecisionDialog: showTrialDecisionDialog ?? this.showTrialDecisionDialog,
+      showTrialDecisionDialog:
+          showTrialDecisionDialog ?? this.showTrialDecisionDialog,
     );
   }
-  
+
   bool get isCalibrated => gRef != null && planeU != null && planeV != null;
   bool get isRecording => status == TestStatus.recording;
   bool get isCompleted => status == TestStatus.completed;
   bool get hasError => errorMessage != null;
   bool get isTrialCompleted => status == TestStatus.trialCompleted;
   bool get isTestingEnded => status == TestStatus.testingEnded;
-  
+
   // Trial management helpers
   List<Trial> get keptTrials => trials.where((trial) => trial.isKept).toList();
-  List<Trial> get discardedTrials => trials.where((trial) => !trial.isKept).toList();
+  List<Trial> get discardedTrials =>
+      trials.where((trial) => !trial.isKept).toList();
   int get totalTrials => trials.length;
   int get keptTrialsCount => keptTrials.length;
   int get discardedTrialsCount => discardedTrials.length;

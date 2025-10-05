@@ -22,7 +22,7 @@ class CalibrationComplete extends TestEvent {
   final Vector3 planeV;
   final double zeroOffsetDeg;
   final double customBaselineAngle;
-  
+
   const CalibrationComplete({
     required this.gRef,
     required this.planeU,
@@ -30,9 +30,10 @@ class CalibrationComplete extends TestEvent {
     required this.zeroOffsetDeg,
     this.customBaselineAngle = 180.0,
   });
-  
+
   @override
-  List<Object?> get props => [gRef, planeU, planeV, zeroOffsetDeg, customBaselineAngle];
+  List<Object?> get props =>
+      [gRef, planeU, planeV, zeroOffsetDeg, customBaselineAngle];
 }
 
 class StartTest extends TestEvent {
@@ -44,36 +45,37 @@ class UpdateSensorData extends TestEvent {
   final Vector3? gyroscope;
   final double liveAngle;
   final double signalQuality;
-  
+
   const UpdateSensorData({
     required this.acceleration,
     this.gyroscope,
     required this.liveAngle,
     required this.signalQuality,
   });
-  
+
   @override
-  List<Object?> get props => [acceleration, gyroscope, liveAngle, signalQuality];
+  List<Object?> get props =>
+      [acceleration, gyroscope, liveAngle, signalQuality];
 }
 
 class DetectDrop extends TestEvent {
   final double peakAngle;
   final DateTime timestamp;
-  
+
   const DetectDrop({
     required this.peakAngle,
     required this.timestamp,
   });
-  
+
   @override
   List<Object?> get props => [peakAngle, timestamp];
 }
 
 class DetectReaction extends TestEvent {
   final DateTime timestamp;
-  
+
   const DetectReaction(this.timestamp);
-  
+
   @override
   List<Object?> get props => [timestamp];
 }
@@ -90,13 +92,13 @@ class SaveTestResults extends TestEvent {
   final double dropAngle;
   final Duration dropTime;
   final double motorVelocity;
-  
+
   const SaveTestResults({
     required this.dropAngle,
     required this.dropTime,
     required this.motorVelocity,
   });
-  
+
   @override
   List<Object?> get props => [dropAngle, dropTime, motorVelocity];
 }
@@ -112,27 +114,27 @@ class EndTesting extends TestEvent {
 
 class KeepTrial extends TestEvent {
   final String? notes;
-  
+
   const KeepTrial({this.notes});
-  
+
   @override
   List<Object?> get props => [notes];
 }
 
 class DiscardTrial extends TestEvent {
   final String? reason;
-  
+
   const DiscardTrial({this.reason});
-  
+
   @override
   List<Object?> get props => [reason];
 }
 
 class SetCustomBaselineAngle extends TestEvent {
   final double angle;
-  
+
   const SetCustomBaselineAngle(this.angle);
-  
+
   @override
   List<Object?> get props => [angle];
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../models/patients.dart';
 import '../bloc/patient/patient_bloc.dart';
@@ -19,15 +20,14 @@ class _PatientFormScreenBlocState extends State<PatientFormScreenBloc> {
   final _idController = TextEditingController();
   final _nameController = TextEditingController();
   final _ageController = TextEditingController();
-  final _genderController = TextEditingController();
   final _commentsController = TextEditingController();
+  String _selectedGender = 'Male';
 
   @override
   void dispose() {
     _idController.dispose();
     _nameController.dispose();
     _ageController.dispose();
-    _genderController.dispose();
     _commentsController.dispose();
     super.dispose();
   }
@@ -35,14 +35,27 @@ class _PatientFormScreenBlocState extends State<PatientFormScreenBloc> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('New Patient Form')),
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        title: const Text(
+          'New Patient Form',
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
       body: BlocListener<PatientBloc, PatientState>(
         listener: (context, state) {
           if (state is PatientOperationSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.message),
+                content: Text(
+                  state.message,
+                  style: const TextStyle(fontSize: 18),
+                ),
                 backgroundColor: Colors.green,
+                duration: const Duration(seconds: 3),
               ),
             );
             
@@ -70,64 +83,100 @@ class _PatientFormScreenBlocState extends State<PatientFormScreenBloc> {
           } else if (state is PatientError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.message),
+                content: Text(
+                  state.message,
+                  style: const TextStyle(fontSize: 18),
+                ),
                 backgroundColor: Colors.red,
+                duration: const Duration(seconds: 4),
               ),
             );
           }
         },
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20.0),
           child: Form(
             key: _formKey,
-            child: ListView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildTextField(
-                  'Patient ID# *',
-                  _idController,
-                  validator: (value) => value?.isEmpty == true ? 'Please enter Patient ID' : null,
-                ),
-                _buildTextField(
-                  'Name *',
-                  _nameController,
-                  validator: (value) => value?.isEmpty == true ? 'Please enter Name' : null,
-                ),
-                _buildTextField(
-                  'Age (yrs)',
-                  _ageController,
-                  keyboardType: TextInputType.number,
-                ),
-                _buildTextField(
-                  'Male/Female',
-                  _genderController,
-                ),
-                _buildTextField(
-                  'Comments / Relevant History',
-                  _commentsController,
-                  maxLines: 4,
+                Text(
+                  'Patient Information',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 20),
+                
+                TextFormField(
+                  controller: _idController,
+                  decoration: const InputDecoration(
+                    labelText: 'Patient ID *',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) => value?.isEmpty == true ? 'Please enter Patient ID' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Full Name *',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) => value?.isEmpty == true ? 'Please enter Name' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _ageController,
+                  decoration: const InputDecoration(
+                    labelText: 'Age (years)',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _selectedGender,
+                  decoration: const InputDecoration(
+                    labelText: 'Gender',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Male', child: Text('Male')),
+                    DropdownMenuItem(value: 'Female', child: Text('Female')),
+                    DropdownMenuItem(value: 'Non-Binary', child: Text('Non-Binary')),
+                    DropdownMenuItem(value: 'Prefer not to say', child: Text('Prefer not to say')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedGender = value ?? _selectedGender;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _commentsController,
+                  decoration: const InputDecoration(
+                    labelText: 'Medical History / Comments',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 4,
+                ),
+                const SizedBox(height: 32),
+                
                 BlocBuilder<PatientBloc, PatientState>(
                   builder: (context, state) {
                     return ElevatedButton(
                       onPressed: state is PatientLoading ? null : _submitForm,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                      ),
                       child: state is PatientLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : const Text('Done'),
+                          ? const Text('Creating Patient...')
+                          : const Text('Create Patient'),
                     );
                   },
                 ),
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -136,24 +185,123 @@ class _PatientFormScreenBlocState extends State<PatientFormScreenBloc> {
     );
   }
 
-  Widget _buildTextField(
+  Widget _buildEnhancedTextField(
     String label,
     TextEditingController controller, {
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
+    IconData? icon,
+    List<TextInputFormatter>? inputFormatters,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: TextFormField(
         controller: controller,
         maxLines: maxLines,
         keyboardType: keyboardType,
         validator: validator,
+        inputFormatters: inputFormatters,
+        style: const TextStyle(fontSize: 20),
         decoration: InputDecoration(
           labelText: label,
-          border: const OutlineInputBorder(),
+          labelStyle: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade700,
+          ),
+          prefixIcon: icon != null ? Icon(icon, color: Colors.blue.shade600) : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
+      ),
+    );
+  }
+
+  Widget _buildGenderDropdown() {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: DropdownButtonFormField<String>(
+        value: _selectedGender,
+        onChanged: (String? newValue) {
+          setState(() {
+            _selectedGender = newValue!;
+          });
+        },
+        style: const TextStyle(fontSize: 20, color: Colors.black87),
+        decoration: InputDecoration(
+          labelText: 'Gender',
+          labelStyle: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade700,
+          ),
+          prefixIcon: Icon(Icons.person_outline, color: Colors.blue.shade600),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        ),
+        items: <String>['Male', 'Female', 'Non-Binary', 'Prefer not to say']
+            .map<DropdownMenuItem<String>>((String value) {
+          return DropdownMenuItem<String>(
+            value: value,
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 20),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -164,14 +312,14 @@ class _PatientFormScreenBlocState extends State<PatientFormScreenBloc> {
       print('ID: ${_idController.text}');
       print('Name: ${_nameController.text}');
       print('Age: ${_ageController.text}');
-      print('Gender: ${_genderController.text}');
+      print('Gender: $_selectedGender');
       print('Condition: ${_commentsController.text}');
       
       final patient = Patient(
         id: _idController.text,
         name: _nameController.text,
         age: _ageController.text,
-        gender: _genderController.text,
+        gender: _selectedGender,
         condition: _commentsController.text,
         createdAt: DateTime.now(),
         lastModified: DateTime.now(),

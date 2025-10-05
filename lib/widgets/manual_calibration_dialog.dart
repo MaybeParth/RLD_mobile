@@ -11,7 +11,8 @@ class ManualCalibrationDialog extends StatefulWidget {
   });
 
   @override
-  State<ManualCalibrationDialog> createState() => _ManualCalibrationDialogState();
+  State<ManualCalibrationDialog> createState() =>
+      _ManualCalibrationDialogState();
 }
 
 class _ManualCalibrationDialogState extends State<ManualCalibrationDialog> {
@@ -51,14 +52,15 @@ class _ManualCalibrationDialogState extends State<ManualCalibrationDialog> {
                     SizedBox(height: 4),
                     Text(
                       '${widget.currentAngle.toStringAsFixed(1)}°',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
               ),
             ),
             SizedBox(height: 20),
-            
+
             // Instructions
             Container(
               padding: EdgeInsets.all(12),
@@ -96,7 +98,7 @@ class _ManualCalibrationDialogState extends State<ManualCalibrationDialog> {
               ),
             ),
             SizedBox(height: 20),
-            
+
             // Manual angle input
             Text(
               'Or manually enter your baseline angle:',
@@ -135,7 +137,7 @@ class _ManualCalibrationDialogState extends State<ManualCalibrationDialog> {
               ],
             ),
             SizedBox(height: 20),
-            
+
             // Baseline angle display
             Card(
               color: Colors.green[50],
@@ -150,7 +152,10 @@ class _ManualCalibrationDialogState extends State<ManualCalibrationDialog> {
                     SizedBox(height: 4),
                     Text(
                       '${_baselineAngle.toStringAsFixed(1)}°',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green[700]),
+                      style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green[700]),
                     ),
                     SizedBox(height: 8),
                     Text(

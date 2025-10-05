@@ -30,16 +30,28 @@ class _PatientListScreenState extends State<PatientListScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Confirm Delete'),
-        content: Text('Are you sure you want to delete ${patient.name}?'),
+        title: Text(
+          'Confirm Delete',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Are you sure you want to delete ${patient.name}?',
+          style: const TextStyle(fontSize: 16),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: const TextStyle(fontSize: 16),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Delete', style: TextStyle(color: Colors.red)),
+            child: Text(
+              'Delete',
+              style: TextStyle(fontSize: 16, color: Colors.red, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -52,7 +64,10 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Deleted ${removedPatient.name}"),
+          content: Text(
+            "Deleted ${removedPatient.name}",
+            style: const TextStyle(fontSize: 16),
+          ),
           action: SnackBarAction(
             label: 'Undo',
             onPressed: () async {
@@ -69,19 +84,22 @@ class _PatientListScreenState extends State<PatientListScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('${patient.name} (ID: ${patient.id})'),
+        title: Text(
+          '${patient.name} (ID: ${patient.id})',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Name: ${patient.name}"),
-            Text("Age: ${patient.age}"),
-            Text("Gender: ${patient.gender}"),
-            Text("Condition: ${patient.condition}"),
+            Text("Name: ${patient.name}", style: const TextStyle(fontSize: 16)),
+            Text("Age: ${patient.age}", style: const TextStyle(fontSize: 16)),
+            Text("Gender: ${patient.gender}", style: const TextStyle(fontSize: 16)),
+            Text("Condition: ${patient.condition}", style: const TextStyle(fontSize: 16)),
             const Divider(),
-            Text("Drop Angle: ${patient.dropAngle?.toStringAsFixed(2) ?? '--'}°"),
-            Text("Drop Time: ${patient.dropTimeMs?.toStringAsFixed(0) ?? '--'} ms"),
-            Text("Motor Velocity: ${patient.motorVelocity?.toStringAsFixed(2) ?? '--'} °/s"),
+            Text("Drop Angle: ${patient.dropAngle?.toStringAsFixed(2) ?? '--'}°", style: const TextStyle(fontSize: 16)),
+            Text("Drop Time: ${patient.dropTimeMs?.toStringAsFixed(0) ?? '--'} ms", style: const TextStyle(fontSize: 16)),
+            Text("Motor Velocity: ${patient.motorVelocity?.toStringAsFixed(2) ?? '--'} °/s", style: const TextStyle(fontSize: 16)),
           ],
         ),
         actions: [
@@ -93,11 +111,17 @@ class _PatientListScreenState extends State<PatientListScreen> {
                 MaterialPageRoute(builder: (_) => SimpleTestScreenBloc(patient: patient)),
               );
             },
-            child: const Text("Perform New Test"),
+            child: const Text(
+              "Perform New Test",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Close"),
+            child: const Text(
+              "Close",
+              style: TextStyle(fontSize: 16),
+            ),
           ),
         ],
       ),
@@ -107,7 +131,12 @@ class _PatientListScreenState extends State<PatientListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Patient Database')),
+      appBar: AppBar(
+        title: const Text(
+          'Patient Database',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+      ),
       body: RefreshIndicator(
         onRefresh: _loadPatients,
         child: patients.isEmpty
@@ -115,7 +144,12 @@ class _PatientListScreenState extends State<PatientListScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           children: const [
             SizedBox(height: 200),
-            Center(child: Text("No patient records found.")),
+            Center(
+              child: Text(
+                "No patient records found.",
+                style: TextStyle(fontSize: 18, color: Colors.grey),
+              ),
+            ),
           ],
         )
             : ListView.builder(
@@ -144,17 +178,24 @@ class _PatientListScreenState extends State<PatientListScreen> {
                       patient.gender.toLowerCase().contains('male') ? Icons.male : Icons.female,
                     ),
                   ),
-                  title: Text('${patient.name} (ID: ${patient.id})'),
+                  title: Text(
+                    '${patient.name} (ID: ${patient.id})',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         '${patient.age} yr old - ${patient.gender}',
                         style: TextStyle(
+                          fontSize: 16,
                           color: patient.gender.toLowerCase().contains('male') ? Colors.red : Colors.purple,
                         ),
                       ),
-                      Text(patient.condition),
+                      Text(
+                        patient.condition,
+                        style: const TextStyle(fontSize: 14),
+                      ),
                     ],
                   ),
                   onTap: () => _showPatientPopup(patient),

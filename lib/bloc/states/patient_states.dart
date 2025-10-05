@@ -19,15 +19,15 @@ class PatientLoading extends PatientState {
 class PatientLoaded extends PatientState {
   final List<Patient> patients;
   final Patient? selectedPatient;
-  
+
   const PatientLoaded({
     required this.patients,
     this.selectedPatient,
   });
-  
+
   @override
   List<Object?> get props => [patients, selectedPatient];
-  
+
   PatientLoaded copyWith({
     List<Patient>? patients,
     Patient? selectedPatient,
@@ -41,9 +41,9 @@ class PatientLoaded extends PatientState {
 
 class PatientError extends PatientState {
   final String message;
-  
+
   const PatientError(this.message);
-  
+
   @override
   List<Object?> get props => [message];
 }
@@ -51,13 +51,12 @@ class PatientError extends PatientState {
 class PatientOperationSuccess extends PatientState {
   final String message;
   final List<Patient> patients;
-  
+
   const PatientOperationSuccess({
     required this.message,
     required this.patients,
   });
-  
+
   @override
   List<Object?> get props => [message, patients];
 }
-

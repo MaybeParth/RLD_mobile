@@ -13,7 +13,8 @@ class PatientBloc extends Bloc<PatientEvent, PatientState> {
     on<SaveCalibration>(_onSaveCalibration);
   }
 
-  Future<void> _onLoadPatients(LoadPatients event, Emitter<PatientState> emit) async {
+  Future<void> _onLoadPatients(
+      LoadPatients event, Emitter<PatientState> emit) async {
     try {
       emit(const PatientLoading());
       final patients = await PatientDatabase.getAllPatients();
@@ -23,21 +24,23 @@ class PatientBloc extends Bloc<PatientEvent, PatientState> {
     }
   }
 
-  Future<void> _onAddPatient(AddPatient event, Emitter<PatientState> emit) async {
+  Future<void> _onAddPatient(
+      AddPatient event, Emitter<PatientState> emit) async {
     try {
       print('🔍 PatientBloc: Adding patient ${event.patient.id}');
       print('🔍 PatientBloc: Patient data: ${event.patient.toMap()}');
-      
+
       // Initialize database if needed
       await PatientDatabase.database;
       print('🔍 PatientBloc: Database initialized successfully');
-      
+
       await PatientDatabase.insertPatient(event.patient);
       print('🔍 PatientBloc: Patient inserted successfully');
-      
+
       final patients = await PatientDatabase.getAllPatients();
-      print('🔍 PatientBloc: Retrieved ${patients.length} patients from database');
-      
+      print(
+          '🔍 PatientBloc: Retrieved ${patients.length} patients from database');
+
       emit(PatientOperationSuccess(
         message: 'Patient added successfully',
         patients: patients,
@@ -50,7 +53,8 @@ class PatientBloc extends Bloc<PatientEvent, PatientState> {
     }
   }
 
-  Future<void> _onUpdatePatient(UpdatePatient event, Emitter<PatientState> emit) async {
+  Future<void> _onUpdatePatient(
+      UpdatePatient event, Emitter<PatientState> emit) async {
     try {
       await PatientDatabase.upsertPatient(event.patient);
       final patients = await PatientDatabase.getAllPatients();
@@ -63,7 +67,8 @@ class PatientBloc extends Bloc<PatientEvent, PatientState> {
     }
   }
 
-  Future<void> _onDeletePatient(DeletePatient event, Emitter<PatientState> emit) async {
+  Future<void> _onDeletePatient(
+      DeletePatient event, Emitter<PatientState> emit) async {
     try {
       await PatientDatabase.deletePatient(event.patientId);
       final patients = await PatientDatabase.getAllPatients();
@@ -83,7 +88,8 @@ class PatientBloc extends Bloc<PatientEvent, PatientState> {
     }
   }
 
-  Future<void> _onSaveCalibration(SaveCalibration event, Emitter<PatientState> emit) async {
+  Future<void> _onSaveCalibration(
+      SaveCalibration event, Emitter<PatientState> emit) async {
     try {
       await PatientDatabase.saveCalibration(
         id: event.patientId,

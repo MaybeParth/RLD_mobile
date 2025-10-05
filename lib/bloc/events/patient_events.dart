@@ -14,36 +14,36 @@ class LoadPatients extends PatientEvent {
 
 class AddPatient extends PatientEvent {
   final Patient patient;
-  
+
   const AddPatient(this.patient);
-  
+
   @override
   List<Object?> get props => [patient];
 }
 
 class UpdatePatient extends PatientEvent {
   final Patient patient;
-  
+
   const UpdatePatient(this.patient);
-  
+
   @override
   List<Object?> get props => [patient];
 }
 
 class DeletePatient extends PatientEvent {
   final String patientId;
-  
+
   const DeletePatient(this.patientId);
-  
+
   @override
   List<Object?> get props => [patientId];
 }
 
 class SelectPatient extends PatientEvent {
   final Patient? patient;
-  
+
   const SelectPatient(this.patient);
-  
+
   @override
   List<Object?> get props => [patient];
 }
@@ -54,7 +54,7 @@ class SaveCalibration extends PatientEvent {
   final List<double> ref;
   final List<double> u;
   final List<double> v;
-  
+
   const SaveCalibration({
     required this.patientId,
     required this.zeroOffsetDeg,
@@ -62,8 +62,7 @@ class SaveCalibration extends PatientEvent {
     required this.u,
     required this.v,
   });
-  
+
   @override
   List<Object?> get props => [patientId, zeroOffsetDeg, ref, u, v];
 }
-

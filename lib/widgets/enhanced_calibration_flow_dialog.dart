@@ -13,10 +13,12 @@ class EnhancedCalibrationFlowDialog extends StatefulWidget {
   });
 
   @override
-  State<EnhancedCalibrationFlowDialog> createState() => _EnhancedCalibrationFlowDialogState();
+  State<EnhancedCalibrationFlowDialog> createState() =>
+      _EnhancedCalibrationFlowDialogState();
 }
 
-class _EnhancedCalibrationFlowDialogState extends State<EnhancedCalibrationFlowDialog> {
+class _EnhancedCalibrationFlowDialogState
+    extends State<EnhancedCalibrationFlowDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -54,14 +56,14 @@ class _EnhancedCalibrationFlowDialogState extends State<EnhancedCalibrationFlowD
   Widget _buildStepIndicator() {
     final steps = ['Position', 'Hold Still', 'Flex Leg', 'Set Baseline'];
     final currentIndex = _getCurrentStepIndex();
-    
+
     return Row(
       children: steps.asMap().entries.map((entry) {
         final index = entry.key;
         final step = entry.value;
         final isActive = index <= currentIndex;
         final isCompleted = index < currentIndex;
-        
+
         return Expanded(
           child: Column(
             children: [
@@ -69,20 +71,22 @@ class _EnhancedCalibrationFlowDialogState extends State<EnhancedCalibrationFlowD
                 width: 30,
                 height: 30,
                 decoration: BoxDecoration(
-                  color: isCompleted ? Colors.green : (isActive ? Colors.blue : Colors.grey),
+                  color: isCompleted
+                      ? Colors.green
+                      : (isActive ? Colors.blue : Colors.grey),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
-                  child: isCompleted 
-                    ? Icon(Icons.check, color: Colors.white, size: 16)
-                    : Text(
-                        '${index + 1}',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                  child: isCompleted
+                      ? Icon(Icons.check, color: Colors.white, size: 16)
+                      : Text(
+                          '${index + 1}',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
                         ),
-                      ),
                 ),
               ),
               SizedBox(height: 4),
@@ -128,7 +132,8 @@ class _EnhancedCalibrationFlowDialogState extends State<EnhancedCalibrationFlowD
         SizedBox(height: 12),
         _buildInstructionItem(
           icon: Icons.phone_android,
-          text: 'Securely attach the device to your leg using the provided strap',
+          text:
+              'Securely attach the device to your leg using the provided strap',
           color: Colors.blue,
         ),
         SizedBox(height: 8),
@@ -200,7 +205,8 @@ class _EnhancedCalibrationFlowDialogState extends State<EnhancedCalibrationFlowD
         SizedBox(height: 8),
         _buildInstructionItem(
           icon: Icons.timer,
-          text: 'Hold the flexed position for 3 seconds, then return to extended',
+          text:
+              'Hold the flexed position for 3 seconds, then return to extended',
           color: Colors.orange,
         ),
       ],
@@ -280,23 +286,31 @@ class _EnhancedCalibrationFlowDialogState extends State<EnhancedCalibrationFlowD
 
   int _getCurrentStepIndex() {
     switch (widget.currentStep) {
-      case 'position': return 0;
-      case 'hold_still': return 1;
-      case 'flex_leg': return 2;
-      case 'set_baseline': return 3;
-      default: return 0;
+      case 'position':
+        return 0;
+      case 'hold_still':
+        return 1;
+      case 'flex_leg':
+        return 2;
+      case 'set_baseline':
+        return 3;
+      default:
+        return 0;
     }
   }
 
   String _getButtonText() {
     switch (widget.currentStep) {
-      case 'position': return 'Start Calibration';
-      case 'hold_still': return 'Hold Still';
-      case 'flex_leg': return 'Flex Leg';
-      case 'set_baseline': return 'Set Baseline';
-      default: return 'Next';
+      case 'position':
+        return 'Start Calibration';
+      case 'hold_still':
+        return 'Hold Still';
+      case 'flex_leg':
+        return 'Flex Leg';
+      case 'set_baseline':
+        return 'Set Baseline';
+      default:
+        return 'Next';
     }
   }
 }
-
-

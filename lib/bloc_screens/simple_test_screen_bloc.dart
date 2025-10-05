@@ -47,6 +47,7 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
   DateTime? _dropStartAt;
   double? _minLegAngleDeg;
   DateTime? _minAt;
+  
 
   double? _tiltZ;
   double? _initialAngleZ;
@@ -60,13 +61,15 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
   AnimationController? _pulseController;
   AnimationController? _recordingController;
 
-  static const double _beta = 0.90;
+  double _beta = 0.85;
   static const int _medianWin = 5;
   final List<double> _angleWindow = <double>[];
   static const double _maxPhysicalDeg = 180.0;
 
   DateTime? _lastAngleT;
   double? _lastAngleDeg;
+  DateTime? _lastUiUpdate;
+  static const Duration _uiUpdateInterval = Duration(milliseconds: 16); // ~60 FPS
   double _omegaDegPerSec = 0.0;
   double _accelMag = 1.0; 
   double _noiseRmsDeg = 0.8;
@@ -204,22 +207,114 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
     return sorted[sorted.length ~/ 2];
   }
 
+  Future<void> _quickRecalibrateToCurrent180() async {
+    if (_gRef == null) {
+      _showSnackBar('Calibrate baseline first, then retry.', Colors.orange);
+      return;
+    }
+    final current = _directLegAngle(_gFiltered);
+    if (current == null) return;
+    final correction = 180.0 - current;
+    setState(() {
+      _zeroOffsetDeg = (_zeroOffsetDeg + correction).clamp(-30.0, 30.0);
+    });
+    await _saveCalibrationToDatabase();
+    _showSnackBar('Recalibrated: set current as 180°', Colors.green);
+  }
+
+  Future<void> _fullRecalibrateBaselineAndPlane() async {
+    try {
+      await _captureStableReference(samples: 60);
+      final okPlane = await _captureFlexAndBuildPlane(samples: 30);
+      if (!okPlane) {
+        _showSnackBar('Flex 5–20° without twisting to define the plane, then try again.', Colors.orange);
+        setState(() => _testState = TestState.idle);
+        return;
+      }
+      await _saveCalibrationForPatient();
+      await _saveCalibrationToDatabase();
+      _showSnackBar('Baseline and plane recalibrated.', Colors.green);
+    } catch (e) {
+      _showSnackBar('Recalibration failed: $e', Colors.red);
+    }
+  }
+
+  void _showRecalibrateDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Recalibrate Start Angle'),
+        content: const Text('Choose how you want to recalibrate.'),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await _quickRecalibrateToCurrent180();
+            },
+            child: const Text('Set current as 180°'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await _fullRecalibrateBaselineAndPlane();
+            },
+            child: const Text('Full recalibrate'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Ensure reference is correctly oriented and the current extended position reads ~180°
+  
+
+  // Fallback: direct angle between current gravity and reference when plane is unreliable
+  double? _directLegAngle(Vector3 gCur) {
+    if (_gRef == null) return null;
+    final raw = _angleBetween(_gRef!, gCur);
+    return (_baselineAngle - (raw + _zeroOffsetDeg)).clamp(0.0, 180.0);
+  }
+
   void _updateLiveAngleAndDetect() {
     if (_gRef == null) {
       setState(() => _liveAngleDeg = null);
       return;
     }
 
-    final leg = _legAngleInPlane(_gFiltered);
-    if (leg == null) return;
+    // Compute leg angle strictly within the calibrated plane; ignore out-of-plane wobble
+    final double? legPlane = _legAngleInPlane(_gFiltered);
+    double? leg = legPlane;
+    if (leg == null) {
+      setState(() => _liveAngleDeg = null);
+      return;
+    }
 
     final smoothed = _medianSmooth(leg);
-    setState(() => _liveAngleDeg = smoothed);
-
+    // Throttle UI updates and ignore unrealistic display jumps to improve perceived stability
     final now = DateTime.now();
+    final allowUi = _lastUiUpdate == null || now.difference(_lastUiUpdate!) >= _uiUpdateInterval || _testState == TestState.recording;
+    final prev = _liveAngleDeg;
+    final jumpOk = _testState == TestState.recording || prev == null || (smoothed - prev).abs() <= 15.0; // no jump suppression during recording
+    if (allowUi && jumpOk) {
+      _lastUiUpdate = now;
+      setState(() {
+        _liveAngleDeg = smoothed;
+      });
+    } else {
+      // keep internal for detection regardless of UI throttle
+      _liveAngleDeg = smoothed;
+    }
+
+    // reuse 'now' defined above
     if (_lastAngleT != null && _lastAngleDeg != null) {
       final dt = now.difference(_lastAngleT!).inMicroseconds / 1e6;
-      if (dt > 0) _omegaDegPerSec = (smoothed - _lastAngleDeg!) / dt;
+      if (dt > 0) {
+        _omegaDegPerSec = (smoothed - _lastAngleDeg!) / dt;
+      }
     }
     _lastAngleT = now;
     _lastAngleDeg = smoothed;
@@ -388,7 +483,8 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
           _gRef = Vector3(freshPatient.calRefX!, freshPatient.calRefY!, freshPatient.calRefZ!).normalized();
           _planeU = Vector3(freshPatient.calUX!, freshPatient.calUY!, freshPatient.calUZ!).normalized();
           _planeV = Vector3(freshPatient.calVX!, freshPatient.calVY!, freshPatient.calVZ!).normalized();
-          _zeroOffsetDeg = freshPatient.calZeroOffsetDeg ?? 0.0;
+          final loaded = freshPatient.calZeroOffsetDeg ?? 0.0;
+          _zeroOffsetDeg = loaded.clamp(-30.0, 30.0);
           setState(() {});
         }
       }
@@ -402,14 +498,15 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
       final updatedPatient = await PatientDatabase.getPatient(widget.patient.id);
       if (updatedPatient != null) {
         // Sort kept trials newest-first (stack behavior)
-        final kept = List<Trial>.from(updatedPatient.keptTrials);
-        kept.sort((a, b) {
-          final at = a.timestamp;
-          final bt = b.timestamp;
-          if (at != null && bt != null) return bt.compareTo(at);
-          // Fallback to id-based ordering if timestamps are missing
-          return b.id.compareTo(a.id);
-        });
+        final kept = List<Trial>.from(updatedPatient.keptTrials)
+          ..sort((a, b) {
+            final at = a.timestamp;
+            final bt = b.timestamp;
+            if (at != null && bt != null) {
+              return bt.compareTo(at);
+            }
+            return b.id.compareTo(a.id);
+          });
         setState(() {
           _keptTrials = kept;
         });
@@ -482,6 +579,8 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
     motionSensors.absoluteOrientationUpdateInterval = 20000;
   }
 
+  
+
   Future<void> _startTest() async {
     if (_testState != TestState.idle) return;
 
@@ -497,9 +596,13 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
       await _saveCalibrationForPatient();
     }
 
+    // Keep calibration fixed across tests; do not auto-adjust here
+
     setState(() {
       _testState = TestState.recording;
       _startTime = DateTime.now();
+      
+      _beta = 0.80; // slightly more responsive during recording
       _dropDetected = false;
       _reactionDetected = false;
       _trialDialogShown = false;
@@ -529,7 +632,8 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
       _testState = TestState.completed;
       _finalAngleZ = _tiltZ;
 
-      final minLeg = _minLegAngleDeg ?? (_liveAngleDeg ?? 180.0);
+      // Use only the in-plane minimum angle for drop angle reporting
+      final double minLeg = _minLegAngleDeg ?? (_liveAngleDeg ?? 180.0);
       _dropAngle = (_baselineAngle - minLeg).clamp(0.0, _maxPhysicalDeg);
 
       if (_dropStartAt != null && _minAt != null) {
@@ -592,7 +696,7 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
                     const SizedBox(height: 8),
                     const Text(
                       'Trial Complete!',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -613,10 +717,10 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Drop Angle:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                        const Text('Drop Angle:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
                         Text(
                           '${trial.dropAngle?.toStringAsFixed(1) ?? 'N/A'}°',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue),
                         ),
                       ],
                     ),
@@ -624,10 +728,10 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Drop Time:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                        const Text('Drop Time:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
                         Text(
                           '${trial.dropTimeMs?.toStringAsFixed(0) ?? 'N/A'}ms',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green),
                         ),
                       ],
                     ),
@@ -636,10 +740,10 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Motor Velocity:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                          const Text('Motor Velocity:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
                           Text(
                             '${trial.motorVelocity!.toStringAsFixed(1)}°/s',
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange),
+                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.orange),
                           ),
                         ],
                       ),
@@ -658,16 +762,21 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
               
               const SizedBox(height: 24),
               
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isWide = constraints.maxWidth > 480;
-                  if (isWide) {
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          fit: FlexFit.loose,
-                          child: OutlinedButton.icon(
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: double.infinity),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth > 480;
+                    if (isWide) {
+                      return SizedBox(
+                        width: double.infinity,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.max,
+                          children: [
+                            Flexible(
+                              fit: FlexFit.tight,
+                              flex: 1,
+                              child: OutlinedButton.icon(
                             onPressed: () async {
                               Navigator.of(context).pop();
                               await _handleTrialDecision(trial, false);
@@ -678,29 +787,31 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
                               side: const BorderSide(color: Colors.red),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Flexible(
-                          fit: FlexFit.loose,
-                          child: ElevatedButton.icon(
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Flexible(
+                              fit: FlexFit.tight,
+                              flex: 1,
+                              child: ElevatedButton.icon(
                             onPressed: () async {
                               Navigator.of(context).pop();
                               await _handleTrialDecision(trial, true);
                             },
                             icon: const Icon(Icons.check, color: Colors.white),
-                            label: const Text('Keep Trial', style: TextStyle(color: Colors.white, fontSize: 16)),
+                            label: const Text('Keep Trial', style: TextStyle(color: Colors.white, fontSize: 18)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
-                    );
-                  }
-                  return Column(
+                      );
+                    }
+                    return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       OutlinedButton.icon(
@@ -709,7 +820,7 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
                           await _handleTrialDecision(trial, false);
                         },
                         icon: const Icon(Icons.delete_outline, color: Colors.red),
-                        label: const Text('Discard', style: TextStyle(color: Colors.red, fontSize: 16)),
+                        label: const Text('Discard', style: TextStyle(color: Colors.red, fontSize: 18)),
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Colors.red),
                           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -722,7 +833,7 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
                           await _handleTrialDecision(trial, true);
                         },
                         icon: const Icon(Icons.check, color: Colors.white),
-                        label: const Text('Keep Trial', style: TextStyle(color: Colors.white, fontSize: 16)),
+                        label: const Text('Keep Trial', style: TextStyle(color: Colors.white, fontSize: 18)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -730,8 +841,9 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
                         ),
                       ),
                     ],
-                  );
-                },
+                    );
+                  },
+                ),
               ),
               ],
             ),
@@ -787,6 +899,7 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
       _minAt = null;
       _dropStartAt = null;
       _angleWindow.clear();
+      _beta = 0.85;
     });
   }
 
@@ -818,7 +931,7 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
           Text(
             "${angle.toStringAsFixed(1)}°",
             style: TextStyle(
-              fontSize: 32,
+              fontSize: 36,
               fontWeight: FontWeight.bold,
               color: gaugeColor,
             ),
@@ -843,8 +956,8 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("0°", style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-              Text("180°", style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+              Text("0°", style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+              Text("180°", style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
             ],
           ),
         ],
@@ -858,11 +971,15 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
         return ElevatedButton.icon(
           onPressed: _startTest,
           icon: const Icon(Icons.play_arrow),
-          label: const Text("Start Test"),
+          label: const Text(
+            "Start Test",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
 
@@ -882,12 +999,18 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
             else
               const CircularProgressIndicator(),
             const SizedBox(height: 8),
-            const Text("Calibrating..."),
+            const Text(
+              "Calibrating...",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
           ],
         );
 
       case TestState.ready:
-        return const Text("Ready to record...");
+        return const Text(
+          "Ready to record...",
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        );
 
       case TestState.recording:
         return Column(
@@ -908,7 +1031,7 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
                       children: [
                         Icon(Icons.fiber_manual_record, color: Colors.red),
                         SizedBox(width: 8),
-                        Text("RECORDING", style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text("RECORDING", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   );
@@ -927,7 +1050,7 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
                   children: [
                     Icon(Icons.fiber_manual_record, color: Colors.red),
                     SizedBox(width: 8),
-                    Text("RECORDING", style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text("RECORDING", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -935,10 +1058,15 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
             ElevatedButton.icon(
               onPressed: _stopRecording,
               icon: const Icon(Icons.stop),
-              label: const Text("Stop Recording"),
+              label: const Text(
+                "Stop Recording",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ],
@@ -966,9 +1094,11 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
+        mainAxisSize: MainAxisSize.max,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
+          Flexible(
+            fit: FlexFit.tight,
             child: Text(
               label,
               style: TextStyle(color: Colors.grey.shade700),
@@ -1012,17 +1142,18 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
             children: [
               const Icon(Icons.check_circle, color: Colors.green, size: 18),
               const SizedBox(width: 6),
-              Expanded(
+              Flexible(
+                fit: FlexFit.loose,
                 child: Text(
                   'Drop angle: ${trial.dropAngle?.toStringAsFixed(1) ?? 'N/A'}°',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 6),
               Text(
                 trial.formattedTimestamp,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
                 overflow: TextOverflow.ellipsis,
               ),
             ],
@@ -1032,13 +1163,16 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
             builder: (context, constraints) {
               if (constraints.maxWidth > 360) {
                 return Row(
+                  mainAxisSize: MainAxisSize.max,
                   children: [
-                    Expanded(
+                    Flexible(
+                      fit: FlexFit.tight,
                       child: _miniMetric('Motor velocity',
                           trial.motorVelocity != null ? '${trial.motorVelocity!.toStringAsFixed(1)}°/s' : 'N/A'),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
+                    Flexible(
+                      fit: FlexFit.tight,
                       child: _miniMetric('Drop time',
                           trial.dropTimeMs != null ? '${trial.dropTimeMs!.toStringAsFixed(0)} ms' : 'N/A'),
                     ),
@@ -1075,44 +1209,16 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
         children: [
           Expanded(
             child: Text(label,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700), overflow: TextOverflow.ellipsis),
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade700), overflow: TextOverflow.ellipsis),
           ),
           const SizedBox(width: 8),
-          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+          Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
         ],
       ),
     );
   }
 
-  Widget _buildTrialMetric(String label, String value, MaterialColor color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.shade50,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: TextStyle(fontSize: 9, color: color.shade600, fontWeight: FontWeight.w500),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ),
-          const SizedBox(height: 1),
-          Text(
-            value,
-            style: TextStyle(fontSize: 11, color: color.shade800, fontWeight: FontWeight.bold),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ),
-        ],
-      ),
-    );
-  }
+  
 
   Widget _buildSignalQuality() {
     Color qualityColor;
@@ -1158,9 +1264,17 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Leg Drop Test'),
+        title: const Text(
+          'Leg Drop Test',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Recalibrate Start Angle',
+            onPressed: _showRecalibrateDialog,
+          ),
           IconButton(
             icon: const Icon(Icons.tune),
             tooltip: 'Fine-tune Calibration',
@@ -1177,45 +1291,45 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Patient Info Card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: Colors.blue,
-                          child: Text(
-                            widget.patient.name.substring(0, 1).toUpperCase(),
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              // Patient Info Card
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: Colors.blue,
+                            child: Text(
+                              widget.patient.name.substring(0, 1).toUpperCase(),
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                widget.patient.name,
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                              ),
-                              Text(
-                                "ID: ${widget.patient.id} • Age: ${widget.patient.age} • ${widget.patient.gender}",
-                                style: TextStyle(color: Colors.grey.shade600),
-                              ),
-                              if (widget.patient.condition.isNotEmpty)
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                                 Text(
-                                  "Condition: ${widget.patient.condition}",
-                                  style: TextStyle(color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                                  widget.patient.name,
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                 ),
-                            ],
+                                Text(
+                                  "ID: ${widget.patient.id} • Age: ${widget.patient.age} • ${widget.patient.gender}",
+                                  style: TextStyle(color: Colors.grey.shade600),
+                                ),
+                                if (widget.patient.condition.isNotEmpty)
+                                  Text(
+                                    "Condition: ${widget.patient.condition}",
+                                    style: TextStyle(color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                                  ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -1259,13 +1373,17 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
                       const SizedBox(height: 16),
                       const Text("Adjust offset to make current angle read 180°:"),
                       const SizedBox(height: 8),
-                      Slider(
-                        value: _zeroOffsetDeg,
-                        min: -30.0,
-                        max: 30.0,
-                        divisions: 120,
-                        label: "${_zeroOffsetDeg.toStringAsFixed(1)}°",
-                        onChanged: _adjustCalibration,
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          return Slider(
+                            value: _zeroOffsetDeg,
+                            min: -30.0,
+                            max: 30.0,
+                            divisions: 120,
+                            label: "${_zeroOffsetDeg.toStringAsFixed(1)}°",
+                            onChanged: _adjustCalibration,
+                          );
+                        },
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1354,10 +1472,12 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(Icons.trending_down, color: Colors.orange.shade700, size: 20),
                                 const SizedBox(width: 8),
-                                Expanded(
+                                Flexible(
+                                  fit: FlexFit.loose,
                                   child: Text(
                                     "Minimum Angle:",
                                     style: const TextStyle(fontWeight: FontWeight.bold),
@@ -1414,7 +1534,8 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
                       children: [
                         Icon(Icons.check_circle, color: Colors.green),
                         const SizedBox(width: 8),
-                        Expanded(
+                        Flexible(
+                          fit: FlexFit.loose,
                           child: Text(
                             "Kept Trials (${_keptTrials.length})",
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -1436,7 +1557,8 @@ class _SimpleTestScreenBlocState extends State<SimpleTestScreenBloc> with Ticker
                           children: [
                             Icon(Icons.info_outline, color: Colors.grey, size: 18),
                             const SizedBox(width: 8),
-                            Expanded(
+                            Flexible(
+                              fit: FlexFit.loose,
                               child: Text(
                                 'No kept trials yet. Complete tests and choose to keep them.',
                                 style: TextStyle(

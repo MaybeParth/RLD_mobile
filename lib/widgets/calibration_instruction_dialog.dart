@@ -15,10 +15,12 @@ class CalibrationInstructionDialog extends StatefulWidget {
   });
 
   @override
-  State<CalibrationInstructionDialog> createState() => _CalibrationInstructionDialogState();
+  State<CalibrationInstructionDialog> createState() =>
+      _CalibrationInstructionDialogState();
 }
 
-class _CalibrationInstructionDialogState extends State<CalibrationInstructionDialog> {
+class _CalibrationInstructionDialogState
+    extends State<CalibrationInstructionDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -218,20 +220,22 @@ class _CalibrationInstructionDialogState extends State<CalibrationInstructionDia
   Widget _buildProgressIndicator() {
     final steps = ['position', 'hold_still', 'flex', 'complete'];
     final currentIndex = steps.indexOf(widget.currentStep);
-    
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: steps.asMap().entries.map((entry) {
         final index = entry.key;
         final isActive = index <= currentIndex;
-        
+
         return Row(
           children: [
             Container(
               width: 12,
               height: 12,
               decoration: BoxDecoration(
-                color: isActive ? Theme.of(context).primaryColor : Colors.grey.shade300,
+                color: isActive
+                    ? Theme.of(context).primaryColor
+                    : Colors.grey.shade300,
                 shape: BoxShape.circle,
               ),
             ),
@@ -239,7 +243,9 @@ class _CalibrationInstructionDialogState extends State<CalibrationInstructionDia
               Container(
                 width: 20,
                 height: 2,
-                color: isActive ? Theme.of(context).primaryColor : Colors.grey.shade300,
+                color: isActive
+                    ? Theme.of(context).primaryColor
+                    : Colors.grey.shade300,
               ),
           ],
         );

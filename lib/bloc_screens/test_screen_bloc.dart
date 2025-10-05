@@ -200,7 +200,7 @@ class _TestScreenBlocState extends State<TestScreenBloc> with TickerProviderStat
                 children: [
                   Text(
                     widget.patient.name,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
                   Text(
                     "ID: ${widget.patient.id} • Age: ${widget.patient.age} • ${widget.patient.gender}",
@@ -238,7 +238,7 @@ class _TestScreenBlocState extends State<TestScreenBloc> with TickerProviderStat
                     const SizedBox(width: 8),
                     Text(
                       'Calibration Status',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -255,7 +255,7 @@ class _TestScreenBlocState extends State<TestScreenBloc> with TickerProviderStat
                   const SizedBox(height: 8),
                   Text(
                     'Baseline Angle: ${state.customBaselineAngle.toStringAsFixed(1)}°',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                   ),
                 ],
               ],
@@ -278,7 +278,7 @@ class _TestScreenBlocState extends State<TestScreenBloc> with TickerProviderStat
                   children: [
                     Icon(Icons.rotate_right, color: Theme.of(context).primaryColor),
                     const SizedBox(width: 8),
-                    const Text("Live Angle", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text("Live Angle", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -306,7 +306,7 @@ class _TestScreenBlocState extends State<TestScreenBloc> with TickerProviderStat
           Text(
             "${angle.toStringAsFixed(1)}°",
             style: TextStyle(
-              fontSize: 32,
+              fontSize: 36,
               fontWeight: FontWeight.bold,
               color: gaugeColor,
             ),
@@ -331,8 +331,8 @@ class _TestScreenBlocState extends State<TestScreenBloc> with TickerProviderStat
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("0°", style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-              Text("180°", style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+              Text("0°", style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+              Text("180°", style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
             ],
           ),
         ],
@@ -352,7 +352,7 @@ class _TestScreenBlocState extends State<TestScreenBloc> with TickerProviderStat
                   children: [
                     Icon(Icons.science, color: Theme.of(context).primaryColor),
                     const SizedBox(width: 8),
-                    const Text("Test Control", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text("Test Control", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -567,7 +567,7 @@ class _TestScreenBlocState extends State<TestScreenBloc> with TickerProviderStat
                   children: [
                     Icon(Icons.list_alt, color: Theme.of(context).primaryColor),
                     const SizedBox(width: 8),
-                    const Text("Trial Management", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text("Trial Management", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   ],
                 ),
                 const SizedBox(height: 16),
