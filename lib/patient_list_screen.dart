@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:excel/excel.dart';
 import '../models/patients.dart';
 import '../db/patient_database.dart';
 import 'bloc_screens/simple_test_screen_bloc.dart';
@@ -148,9 +149,9 @@ class _PatientListScreenState extends State<PatientListScreen> {
             onPressed: _exportAllAsJson,
           ),
           IconButton(
-            tooltip: 'Export CSV',
-            icon: const Icon(Icons.table_chart),
-            onPressed: _exportAllAsCsv,
+            tooltip: 'Export XLSX',
+            icon: const Icon(Icons.grid_on),
+            onPressed: _exportAllAsXlsx,
           ),
         ],
       ),
@@ -240,34 +241,29 @@ extension _PatientExport on _PatientListScreenState {
     }
   }
 
-  Future<void> _exportAllAsCsv() async {
+  Future<void> _exportAllAsXlsx() async {
     try {
       final all = await PatientDatabase.getAllPatients();
+      final excel = Excel.createExcel();
+      final sheet = excel['Patients'];
 
-      // Header columns
+      // Header row
       final headers = <String>[
         'id','name','age','gender','condition',
         'createdAt','lastModified',
         'calZeroOffsetDeg','calRefX','calRefY','calRefZ','calUX','calUY','calUZ','calVX','calVY','calVZ','calibratedAtIso','dropsSinceCal','customBaselineAngle',
         'legacy_initialZ','legacy_finalZ','legacy_dropAngle','legacy_dropTimeMs','legacy_motorVelocity',
         'trials_count','kept_trials_count','discarded_trials_count',
-        // Flatten a few recent trials (up to 3) for convenience
-        'trial1_id','trial1_timestamp','trial1_isKept','trial1_dropAngle','trial1_dropTimeMs','trial1_motorVelocity',
-        'trial2_id','trial2_timestamp','trial2_isKept','trial2_dropAngle','trial2_dropTimeMs','trial2_motorVelocity',
-        'trial3_id','trial3_timestamp','trial3_isKept','trial3_dropAngle','trial3_dropTimeMs','trial3_motorVelocity',
       ];
+      sheet.appendRow(headers.map<CellValue?>((s) => TextCellValue(s)).toList());
 
-      final rows = <List<String>>[];
-      rows.add(headers);
+      String fmtDate(DateTime? d) => d != null ? d.toIso8601String() : '';
+      String fmtNum(num? n) => n == null ? '' : n.toString();
 
       for (final p in all) {
-        String fmtDate(DateTime? d) => d != null ? d.toIso8601String() : '';
-        String fmtNum(num? n) => n == null ? '' : n.toString();
-
         final kept = p.keptTrials;
         final discarded = p.discardedTrials;
-
-        List<String> base = [
+        final row = <String>[
           p.id,
           p.name,
           p.age,
@@ -291,39 +287,39 @@ extension _PatientExport on _PatientListScreenState {
           kept.length.toString(),
           discarded.length.toString(),
         ];
-
-        List<String> trialCols = [];
-        for (int i = 0; i < 3; i++) {
-          if (i < p.trials.length) {
-            final t = p.trials[i];
-            trialCols.addAll([
-              t.id,
-              t.timestamp.toIso8601String(),
-              (t.isKept == true).toString(),
-              fmtNum(t.dropAngle),
-              fmtNum(t.dropTimeMs),
-              fmtNum(t.motorVelocity),
-            ]);
-          } else {
-            trialCols.addAll(['','','','','','']);
-          }
-        }
-
-        rows.add([...base, ...trialCols]);
+        sheet.appendRow(row.map<CellValue?>((s) => TextCellValue(s)).toList());
       }
 
-      final csv = rows.map((r) => r.map(_escapeCsv).join(',')).join('\n');
-      final file = await _writeTempFile('patients_export.csv', csv);
-      await Share.shareXFiles([XFile(file.path)], text: 'Patient database export (CSV)');
+      // Separate sheet for trials (one row per trial)
+      final trialSheet = excel['Trials'];
+      final trialHeaders = <String>[
+        'patient_id','patient_name',
+        'trial_id','timestamp','isKept','dropAngle','dropTimeMs','motorVelocity','notes','discardReason'
+      ];
+      trialSheet.appendRow(trialHeaders.map<CellValue?>((s) => TextCellValue(s)).toList());
+      for (final p in all) {
+        for (final t in p.trials) {
+          trialSheet.appendRow([
+            TextCellValue(p.id),
+            TextCellValue(p.name),
+            TextCellValue(t.id),
+            TextCellValue(t.timestamp.toIso8601String()),
+            TextCellValue(t.isKept ? 'true' : 'false'),
+            TextCellValue(fmtNum(t.dropAngle)),
+            TextCellValue(fmtNum(t.dropTimeMs)),
+            TextCellValue(fmtNum(t.motorVelocity)),
+            TextCellValue(t.notes ?? ''),
+            TextCellValue(t.discardReason ?? ''),
+          ]);
+        }
+      }
+
+      final bytes = excel.encode()!;
+      final file = await _writeTempBytes('patients_export.xlsx', bytes);
+      await Share.shareXFiles([XFile(file.path)], text: 'Patient database export (XLSX)');
     } catch (e) {
       _showSnack('Export failed: $e');
     }
-  }
-
-  String _escapeCsv(String s) {
-    final needsQuotes = s.contains(',') || s.contains('"') || s.contains('\n');
-    String v = s.replaceAll('"', '""');
-    return needsQuotes ? '"$v"' : v;
   }
 
   Future<File> _writeTempFile(String filename, String contents) async {
@@ -331,6 +327,13 @@ extension _PatientExport on _PatientListScreenState {
     final path = p.join(dir.path, filename);
     final file = File(path);
     return file.writeAsString(contents);
+  }
+
+  Future<File> _writeTempBytes(String filename, List<int> bytes) async {
+    final dir = await getTemporaryDirectory();
+    final path = p.join(dir.path, filename);
+    final file = File(path);
+    return file.writeAsBytes(bytes, flush: true);
   }
 
   void _showSnack(String message) {
