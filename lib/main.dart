@@ -25,6 +25,7 @@ class MyApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
+        debugShowCheckedModeBanner: false,
         title: 'Reactive Leg Drop',
         theme: ThemeData(
           primarySwatch: Colors.blue,

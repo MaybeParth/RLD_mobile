@@ -1,4 +1,3 @@
-import 'dart:convert' as convert;
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -18,6 +17,29 @@ class PatientListScreen extends StatefulWidget {
 
 class _PatientListScreenState extends State<PatientListScreen> {
   List<Patient> patients = [];
+  final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
+
+  IconData _genderIcon(String gender) {
+    final g = gender.trim().toLowerCase();
+    final isFemale = g == 'female' || g.startsWith('fem') || g.contains('female');
+    final isMale = !isFemale && (g == 'male' || g.startsWith('mal') || g.contains(' male') || g.endsWith('male'));
+    final isNonBinary = g.contains('non-binary') || g.contains('nonbinary') || g.contains('non binary') || g == 'nb';
+    if (isFemale) return Icons.female;
+    if (isMale) return Icons.male;
+    if (isNonBinary) return Icons.person;
+    return Icons.person;
+  }
+
+  Color _genderColor(String gender) {
+    final g = gender.trim().toLowerCase();
+    final isFemale = g == 'female' || g.startsWith('fem') || g.contains('female');
+    final isMale = !isFemale && (g == 'male' || g.startsWith('mal') || g.contains(' male') || g.endsWith('male'));
+    final isNonBinary = g.contains('non-binary') || g.contains('nonbinary') || g.contains('non binary') || g == 'nb';
+    if (isFemale) return Colors.pink;
+    if (isMale) return Colors.blue;
+    if (isNonBinary) return Colors.purple;
+    return Colors.grey;
+  }
 
   @override
   void initState() {
@@ -32,7 +54,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
     });
   }
 
-  Future<void> _deletePatient(Patient patient) async {
+  Future<void> _deletePatient(int index, Patient patient) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -66,7 +88,17 @@ class _PatientListScreenState extends State<PatientListScreen> {
     if (confirmed == true) {
       await PatientDatabase.deletePatient(patient.id);
       final removedPatient = patient;
-      setState(() => patients.remove(patient));
+      setState(() => patients.removeAt(index));
+      _listKey.currentState?.removeItem(
+        index,
+        (context, animation) => _buildAnimatedTile(
+          context,
+          index,
+          removedPatient,
+          animation,
+        ),
+        duration: const Duration(milliseconds: 220),
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -78,7 +110,15 @@ class _PatientListScreenState extends State<PatientListScreen> {
             label: 'Undo',
             onPressed: () async {
               await PatientDatabase.insertPatient(removedPatient);
-              _loadPatients();
+              if (!mounted) return;
+              setState(() {
+                final insertIndex = (index <= patients.length) ? index : patients.length;
+                patients.insert(insertIndex, removedPatient);
+                _listKey.currentState?.insertItem(
+                  insertIndex,
+                  duration: const Duration(milliseconds: 220),
+                );
+              });
             },
           ),
         ),
@@ -134,6 +174,59 @@ class _PatientListScreenState extends State<PatientListScreen> {
     );
   }
 
+  Widget _buildAnimatedTile(BuildContext context, int index, Patient patient, Animation<double> animation) {
+    final tile = Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      elevation: 3,
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: _genderColor(patient.gender).withOpacity(0.15),
+          child: Icon(
+            _genderIcon(patient.gender),
+            color: _genderColor(patient.gender),
+          ),
+        ),
+        title: Text(
+          '${patient.name} (ID: ${patient.id})',
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${patient.age} yr old - ${patient.gender}',
+              style: TextStyle(fontSize: 16, color: _genderColor(patient.gender)),
+            ),
+            Text(
+              patient.condition,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ],
+        ),
+        onTap: () => _showPatientPopup(patient),
+      ),
+    );
+
+    return SizeTransition(
+      sizeFactor: CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+      child: Dismissible(
+        key: Key(patient.id),
+        direction: DismissDirection.endToStart,
+        confirmDismiss: (direction) async {
+          await _deletePatient(index, patient);
+          return false;
+        },
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          color: Colors.red,
+          child: const Icon(Icons.delete, color: Colors.white),
+        ),
+        child: tile,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -143,11 +236,6 @@ class _PatientListScreenState extends State<PatientListScreen> {
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Export JSON',
-            icon: const Icon(Icons.file_download),
-            onPressed: _exportAllAsJson,
-          ),
           IconButton(
             tooltip: 'Export XLSX',
             icon: const Icon(Icons.grid_on),
@@ -170,56 +258,12 @@ class _PatientListScreenState extends State<PatientListScreen> {
             ),
           ],
         )
-            : ListView.builder(
-          itemCount: patients.length,
-          itemBuilder: (context, index) {
+            : AnimatedList(
+          key: _listKey,
+          initialItemCount: patients.length,
+          itemBuilder: (context, index, animation) {
             final patient = patients[index];
-            return Dismissible(
-              key: Key(patient.id),
-              direction: DismissDirection.endToStart,
-              confirmDismiss: (direction) async {
-                await _deletePatient(patient);
-                return false; // Prevent Dismissible from auto-removing the item
-              },
-              background: Container(
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 20),
-                color: Colors.red,
-                child: const Icon(Icons.delete, color: Colors.white),
-              ),
-              child: Card(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                elevation: 3,
-                child: ListTile(
-                  leading: CircleAvatar(
-                    child: Icon(
-                      patient.gender.toLowerCase().contains('male') ? Icons.male : Icons.female,
-                    ),
-                  ),
-                  title: Text(
-                    '${patient.name} (ID: ${patient.id})',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${patient.age} yr old - ${patient.gender}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: patient.gender.toLowerCase().contains('male') ? Colors.red : Colors.purple,
-                        ),
-                      ),
-                      Text(
-                        patient.condition,
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ],
-                  ),
-                  onTap: () => _showPatientPopup(patient),
-                ),
-              ),
-            );
+            return _buildAnimatedTile(context, index, patient, animation);
           },
         ),
       ),
@@ -228,18 +272,6 @@ class _PatientListScreenState extends State<PatientListScreen> {
 }
 
 extension _PatientExport on _PatientListScreenState {
-  Future<void> _exportAllAsJson() async {
-    try {
-      final all = await PatientDatabase.getAllPatients();
-      final data = all.map((p) => p.toMap()).toList();
-      final jsonStr = convert.JsonEncoder.withIndent('  ').convert(data);
-
-      final file = await _writeTempFile('patients_export.json', jsonStr);
-      await Share.shareXFiles([XFile(file.path)], text: 'Patient database export (JSON)');
-    } catch (e) {
-      _showSnack('Export failed: $e');
-    }
-  }
 
   Future<void> _exportAllAsXlsx() async {
     try {
@@ -320,13 +352,6 @@ extension _PatientExport on _PatientListScreenState {
     } catch (e) {
       _showSnack('Export failed: $e');
     }
-  }
-
-  Future<File> _writeTempFile(String filename, String contents) async {
-    final dir = await getTemporaryDirectory();
-    final path = p.join(dir.path, filename);
-    final file = File(path);
-    return file.writeAsString(contents);
   }
 
   Future<File> _writeTempBytes(String filename, List<int> bytes) async {

@@ -83,6 +83,11 @@ class PatientDatabase {
     final map = patient.toMap();            
     map['createdAt'] = map['createdAt'] ?? now;
     map['lastModified'] = now;
+    // Ensure trials are stored as JSON string in DB
+    final trialsValue = map['trials'];
+    if (trialsValue is List) {
+      map['trials'] = jsonEncode(trialsValue);
+    }
 
     await db.insert(
       'patients',
@@ -96,6 +101,11 @@ class PatientDatabase {
     final now = DateTime.now().toIso8601String();
     final map = patient.toMap();
     map['lastModified'] = now;
+    // Ensure trials are stored as JSON string in DB
+    final trialsValue = map['trials'];
+    if (trialsValue is List) {
+      map['trials'] = jsonEncode(trialsValue);
+    }
 
     final exists = await db.query('patients', where: 'id = ?', whereArgs: [patient.id], limit: 1);
     if (exists.isEmpty) {
