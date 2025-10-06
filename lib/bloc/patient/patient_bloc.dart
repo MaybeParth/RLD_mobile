@@ -27,28 +27,28 @@ class PatientBloc extends Bloc<PatientEvent, PatientState> {
   Future<void> _onAddPatient(
       AddPatient event, Emitter<PatientState> emit) async {
     try {
-      print('🔍 PatientBloc: Adding patient ${event.patient.id}');
-      print('🔍 PatientBloc: Patient data: ${event.patient.toMap()}');
+      // print('🔍 PatientBloc: Adding patient ${event.patient.id}');
+      // print('🔍 PatientBloc: Patient data: ${event.patient.toMap()}');
 
       // Initialize database if needed
       await PatientDatabase.database;
-      print('🔍 PatientBloc: Database initialized successfully');
+      // print('🔍 PatientBloc: Database initialized successfully');
 
       await PatientDatabase.insertPatient(event.patient);
-      print('🔍 PatientBloc: Patient inserted successfully');
+      // print('🔍 PatientBloc: Patient inserted successfully');
 
       final patients = await PatientDatabase.getAllPatients();
-      print(
-          '🔍 PatientBloc: Retrieved ${patients.length} patients from database');
+      // print(
+          // '🔍 PatientBloc: Retrieved ${patients.length} patients from database');
 
       emit(PatientOperationSuccess(
         message: 'Patient added successfully',
         patients: patients,
       ));
-      print('🔍 PatientBloc: Emitted PatientOperationSuccess');
+      // print('🔍 PatientBloc: Emitted PatientOperationSuccess');
     } catch (e, stackTrace) {
-      print('❌ PatientBloc: Error adding patient: $e');
-      print('❌ PatientBloc: Stack trace: $stackTrace');
+      // print('❌ PatientBloc: Error adding patient: $e');
+      // print('❌ PatientBloc: Stack trace: $stackTrace');
       emit(PatientError('Failed to add patient: $e'));
     }
   }

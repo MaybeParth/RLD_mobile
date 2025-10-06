@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/patients.dart';
 import '../db/patient_database.dart';
 import 'bloc_screens/simple_test_screen_bloc.dart';
+import 'services/csv_export_service.dart';
+import 'package:path_provider/path_provider.dart';
 
 class PatientListScreen extends StatefulWidget {
   const PatientListScreen({super.key});
@@ -104,6 +106,29 @@ class _PatientListScreenState extends State<PatientListScreen> {
         ),
         actions: [
           TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                final files = await CsvExportService.exportPatient(patient);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Exported ${files.length} file(s) for ${patient.name} to Documents/RLD_Exports'),
+                  ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Export failed: $e')),
+                );
+              }
+            },
+            child: const Text(
+              'Export CSV',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+          TextButton(
             onPressed: () {
               Navigator.pop(context);
               Navigator.push(
@@ -136,6 +161,28 @@ class _PatientListScreenState extends State<PatientListScreen> {
           'Patient Database',
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Export all patients CSV',
+            icon: const Icon(Icons.download),
+            onPressed: () async {
+              try {
+                final files = await CsvExportService.exportAll();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Exported ${files.length} file(s) to Documents/RLD_Exports'),
+                  ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Export failed: $e')),
+                );
+              }
+            },
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _loadPatients,
