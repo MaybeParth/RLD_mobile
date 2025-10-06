@@ -1,9 +1,12 @@
+import 'dart:convert' as convert;
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import '../models/patients.dart';
 import '../db/patient_database.dart';
 import 'bloc_screens/simple_test_screen_bloc.dart';
-import 'services/csv_export_service.dart';
-import 'package:path_provider/path_provider.dart';
 
 class PatientListScreen extends StatefulWidget {
   const PatientListScreen({super.key});
@@ -59,7 +62,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
       ),
     );
 
-    if (confirmed ?? false) {
+    if (confirmed == true) {
       await PatientDatabase.deletePatient(patient.id);
       final removedPatient = patient;
       setState(() => patients.remove(patient));
@@ -106,29 +109,6 @@ class _PatientListScreenState extends State<PatientListScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              try {
-                final files = await CsvExportService.exportPatient(patient);
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Exported ${files.length} file(s) for ${patient.name} to Documents/RLD_Exports'),
-                  ),
-                );
-              } catch (e) {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Export failed: $e')),
-                );
-              }
-            },
-            child: const Text(
-              'Export CSV',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
-          TextButton(
             onPressed: () {
               Navigator.pop(context);
               Navigator.push(
@@ -163,24 +143,14 @@ class _PatientListScreenState extends State<PatientListScreen> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Export all patients CSV',
-            icon: const Icon(Icons.download),
-            onPressed: () async {
-              try {
-                final files = await CsvExportService.exportAll();
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Exported ${files.length} file(s) to Documents/RLD_Exports'),
-                  ),
-                );
-              } catch (e) {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Export failed: $e')),
-                );
-              }
-            },
+            tooltip: 'Export JSON',
+            icon: const Icon(Icons.file_download),
+            onPressed: _exportAllAsJson,
+          ),
+          IconButton(
+            tooltip: 'Export CSV',
+            icon: const Icon(Icons.table_chart),
+            onPressed: _exportAllAsCsv,
           ),
         ],
       ),
@@ -252,6 +222,121 @@ class _PatientListScreenState extends State<PatientListScreen> {
           },
         ),
       ),
+    );
+  }
+}
+
+extension _PatientExport on _PatientListScreenState {
+  Future<void> _exportAllAsJson() async {
+    try {
+      final all = await PatientDatabase.getAllPatients();
+      final data = all.map((p) => p.toMap()).toList();
+      final jsonStr = convert.JsonEncoder.withIndent('  ').convert(data);
+
+      final file = await _writeTempFile('patients_export.json', jsonStr);
+      await Share.shareXFiles([XFile(file.path)], text: 'Patient database export (JSON)');
+    } catch (e) {
+      _showSnack('Export failed: $e');
+    }
+  }
+
+  Future<void> _exportAllAsCsv() async {
+    try {
+      final all = await PatientDatabase.getAllPatients();
+
+      // Header columns
+      final headers = <String>[
+        'id','name','age','gender','condition',
+        'createdAt','lastModified',
+        'calZeroOffsetDeg','calRefX','calRefY','calRefZ','calUX','calUY','calUZ','calVX','calVY','calVZ','calibratedAtIso','dropsSinceCal','customBaselineAngle',
+        'legacy_initialZ','legacy_finalZ','legacy_dropAngle','legacy_dropTimeMs','legacy_motorVelocity',
+        'trials_count','kept_trials_count','discarded_trials_count',
+        // Flatten a few recent trials (up to 3) for convenience
+        'trial1_id','trial1_timestamp','trial1_isKept','trial1_dropAngle','trial1_dropTimeMs','trial1_motorVelocity',
+        'trial2_id','trial2_timestamp','trial2_isKept','trial2_dropAngle','trial2_dropTimeMs','trial2_motorVelocity',
+        'trial3_id','trial3_timestamp','trial3_isKept','trial3_dropAngle','trial3_dropTimeMs','trial3_motorVelocity',
+      ];
+
+      final rows = <List<String>>[];
+      rows.add(headers);
+
+      for (final p in all) {
+        String fmtDate(DateTime? d) => d != null ? d.toIso8601String() : '';
+        String fmtNum(num? n) => n == null ? '' : n.toString();
+
+        final kept = p.keptTrials;
+        final discarded = p.discardedTrials;
+
+        List<String> base = [
+          p.id,
+          p.name,
+          p.age,
+          p.gender,
+          p.condition,
+          fmtDate(p.createdAt),
+          fmtDate(p.lastModified),
+          fmtNum(p.calZeroOffsetDeg),
+          fmtNum(p.calRefX), fmtNum(p.calRefY), fmtNum(p.calRefZ),
+          fmtNum(p.calUX), fmtNum(p.calUY), fmtNum(p.calUZ),
+          fmtNum(p.calVX), fmtNum(p.calVY), fmtNum(p.calVZ),
+          p.calibratedAtIso ?? '',
+          p.dropsSinceCal?.toString() ?? '',
+          fmtNum(p.customBaselineAngle),
+          fmtNum(p.initialZ),
+          fmtNum(p.finalZ),
+          fmtNum(p.dropAngle),
+          fmtNum(p.dropTimeMs),
+          fmtNum(p.motorVelocity),
+          p.trials.length.toString(),
+          kept.length.toString(),
+          discarded.length.toString(),
+        ];
+
+        List<String> trialCols = [];
+        for (int i = 0; i < 3; i++) {
+          if (i < p.trials.length) {
+            final t = p.trials[i];
+            trialCols.addAll([
+              t.id,
+              t.timestamp.toIso8601String(),
+              (t.isKept == true).toString(),
+              fmtNum(t.dropAngle),
+              fmtNum(t.dropTimeMs),
+              fmtNum(t.motorVelocity),
+            ]);
+          } else {
+            trialCols.addAll(['','','','','','']);
+          }
+        }
+
+        rows.add([...base, ...trialCols]);
+      }
+
+      final csv = rows.map((r) => r.map(_escapeCsv).join(',')).join('\n');
+      final file = await _writeTempFile('patients_export.csv', csv);
+      await Share.shareXFiles([XFile(file.path)], text: 'Patient database export (CSV)');
+    } catch (e) {
+      _showSnack('Export failed: $e');
+    }
+  }
+
+  String _escapeCsv(String s) {
+    final needsQuotes = s.contains(',') || s.contains('"') || s.contains('\n');
+    String v = s.replaceAll('"', '""');
+    return needsQuotes ? '"$v"' : v;
+  }
+
+  Future<File> _writeTempFile(String filename, String contents) async {
+    final dir = await getTemporaryDirectory();
+    final path = p.join(dir.path, filename);
+    final file = File(path);
+    return file.writeAsString(contents);
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 }
